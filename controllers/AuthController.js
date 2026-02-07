@@ -249,6 +249,7 @@ exports.signIn = async function (req, res) {
 }*/
 
 exports.signIn = async function (req, res) {
+
     try {
 
         const fieldsValidation = new Validator(req.body, {
@@ -357,7 +358,8 @@ exports.signIn = async function (req, res) {
         if (providerType === "EMAIL") {
 
             if (!otp) {
-                await sendEmailOtp(email);
+                let isUserExists = await Users.findOne({ email: email , providerType: "EMAIL" });
+                await sendEmailOtp(email, isUserExists ? "LOGIN" : "REGISTER");
                 return res.status(200).json({
                     'meta': {
                         'message': "OTP sent to email",
