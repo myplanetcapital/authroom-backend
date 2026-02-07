@@ -291,33 +291,65 @@ exports.signIn = async function (req, res) {
 
         if (providerType === "GOOGLE") {
 
-            const CLIENT_ID =
-                platform === "ANDROID"
-                    ? CLIENT_ID_GOOGLE_ANDROID
-                    : CLIENT_ID_GOOGLE_IOS;
+            try {
 
-            const client = new OAuth2Client(CLIENT_ID);
-            const ticket = await client.verifyIdToken({
-                idToken: token,
-                audience: CLIENT_ID
-            });
 
-            const payload = ticket.payload;
-            providerUserId = payload.sub;
-            emailId = payload.email;
-            providerObj = payload;
+
+                const CLIENT_ID =
+                    platform === "ANDROID"
+                        ? CLIENT_ID_GOOGLE_ANDROID
+                        : CLIENT_ID_GOOGLE_IOS;
+
+                const client = new OAuth2Client(CLIENT_ID);
+                const ticket = await client.verifyIdToken({
+                    idToken: token,
+                    audience: CLIENT_ID
+                });
+
+                const payload = ticket.payload;
+                providerUserId = payload.sub;
+                emailId = payload.email;
+                providerObj = payload;
+            } catch (ex) {
+
+                return res.status(422).json({
+                    'meta': {
+                        'message': "Google Token May be Expire.",
+                        'status_code': 422,
+                        'status': false,
+                    }
+                });
+
+            }
         }
 
         if (providerType === "APPLE") {
 
-            const { header } = jwt.decode(token, { complete: true });
-            const publicKey = (await key(header.kid)).getPublicKey();
+            try {
 
-            const decoded = jwt.verify(token, publicKey, { algorithms: ['RS256'] });
 
-            providerUserId = decoded.sub;
-            emailId = decoded.email || null; // Apple may hide email
-            providerObj = decoded;
+
+
+                const { header } = jwt.decode(token, { complete: true });
+                const publicKey = (await key(header.kid)).getPublicKey();
+
+                const decoded = jwt.verify(token, publicKey, { algorithms: ['RS256'] });
+
+                providerUserId = decoded.sub;
+                emailId = decoded.email || null; // Apple may hide email
+                providerObj = decoded;
+                
+            } catch (ex) {
+
+                return res.status(422).json({
+                    'meta': {
+                        'message': "Apple Token May be Expire.",
+                        'status_code': 422,
+                        'status': false,
+                    }
+                });
+
+            }
         }
 
         /* ---------------- EMAIL OTP LOGIN ---------------- */
