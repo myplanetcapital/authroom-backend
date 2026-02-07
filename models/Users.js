@@ -32,6 +32,12 @@ const UsersSchema = new Schema({
 UsersSchema.plugin(dataTables);
 UsersSchema.index({
     "email":1
-},{"unique":true});
+});
+
+UsersSchema.index({
+    "providerType":1,
+    "providerUserId":1
+});
+
 
 module.exports = mongoose.model("Users", UsersSchema, "Users");

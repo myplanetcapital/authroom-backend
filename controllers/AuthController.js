@@ -16,7 +16,8 @@ const CLIENT_ID_GOOGLE_ANDROID = '970089445577-jkqobq31pl5gd8t41rkece7p476gq9a2.
 const CLIENT_ID_GOOGLE_IOS = '970089445577-go2bg010bh0ba7t86rde063oea94jvf6.apps.googleusercontent.com';
 const NodeCache = require("node-cache");
 const myCache = new NodeCache();
-let SEND_MAIL = require('../vendor/SendMail');
+let sendEmailOtp = require('../vendor/sendEmailOtp');
+let verifyEmailOtp = require('../vendor/verifyEmailOtp');
 
 
 async function key(kid) {
@@ -253,10 +254,11 @@ exports.signIn = async function (req, res) {
         const fieldsValidation = new Validator(req.body, {
             providerType: 'required|in:GOOGLE,APPLE,EMAIL',
             platform: 'required|in:ANDROID,IOS',
-            token: 'sometimes|required',
-            userInfo: 'sometimes|required',
-            'userInfo.email': 'sometimes|required|email',
-            otp: 'sometimes|required'
+            token: 'required|sometimes',
+            otp: 'required|sometimes',
+            userInfo: 'required|sometimes',
+            'userInfo.email': 'required|sometimes|email',
+
         });
 
         const isValidated = await fieldsValidation.check();
@@ -273,7 +275,13 @@ exports.signIn = async function (req, res) {
 
         }
 
-        const { providerType, token, platform, email, otp } = req.body;
+        let providerType = req.body.providerType;
+        let platform = req.body.platform;
+        let email = req.body.userInfo ? req.body.userInfo.email : null;
+        let token = req.body.token;
+        let otp = req.body.otp;
+
+
 
         let providerUserId;
         let emailId;
@@ -313,60 +321,96 @@ exports.signIn = async function (req, res) {
         }
 
         /* ---------------- EMAIL OTP LOGIN ---------------- */
-
+        let isEmailOtpVerified = false;
         if (providerType === "EMAIL") {
 
             if (!otp) {
                 await sendEmailOtp(email);
-                return res.json({
-                    meta: { status: true, message: "OTP sent to email" }
+                return res.status(422).json({
+                    'meta': {
+                        'message': "OTP sent to email",
+                        'status_code': 422,
+                        'status': false,
+                    }
                 });
             }
 
-            await verifyEmailOtp(email, otp);
+            try {
+                await verifyEmailOtp(email, otp);
+                isEmailOtpVerified = true;
+            } catch (err) {
+                return res.status(422).json({
+                    'meta': {
+                        'message': err.message,
+                        'status_code': 422,
+                        'status': false,
+                    }
+                });
+            }
+
             providerUserId = email;
             emailId = email;
         }
 
         /* ---------------- AUTH PROVIDER CHECK ---------------- */
 
-        let auth = await AuthProviders.findOne({
-            providerType,
-            providerUserId
+        let user = await Users.findOne({
+            $or: [
+                {
+                    providerType: providerType,
+                    providerUserId: providerUserId
+                },
+                ...(emailId ? [{ email: emailId }] : [])
+            ]
         });
 
-        let user;
 
-        if (auth) {
-            user = await Users.findById(auth.userId);
+        // 2️⃣ Create or update user
+        if (!user) {
+
+            // 🆕 New user
+            user = await Users.create({
+                email: emailId || null,
+                providerType: providerType,
+                providerUserId: providerUserId,
+                providerData: providerObj,
+                isEmailVerified: providerType !== "EMAIL" || isEmailOtpVerified,
+                status: "ACTIVE"
+            });
+
         } else {
 
-            if (emailId) {
-                user = await Users.findOne({ email: emailId });
+            // 🔁 Existing user → update provider info
+            user.providerType = providerType;
+            user.providerUserId = providerUserId;
+            user.providerData = providerObj;
+
+            // Set email if missing
+            if (emailId && !user.email) {
+                user.email = emailId;
             }
 
-            if (!user) {
-                user = await Users.create({
-                    email: emailId,
-                    isEmailVerified: providerType !== "EMAIL",
-                    status: "ACTIVE"
-                });
+            // Social login auto-verifies email
+            if (providerType !== "EMAIL" || isEmailOtpVerified) {
+                user.isEmailVerified = true;
             }
 
-            await AuthProviders.create({
-                userId: user._id,
-                providerType,
-                providerUserId,
-                providerData: providerObj
-            });
+            await user.save();
         }
+
+
 
         /* ---------------- ACCOUNT STATUS CHECK ---------------- */
 
         if (user.status !== "ACTIVE") {
-            return res.status(403).json({
-                meta: { status: false, message: "Account locked" }
+            return res.status(422).json({
+                'meta': {
+                    'message': "Account locked",
+                    'status_code': 422,
+                    'status': false,
+                }
             });
+
         }
 
         /* ---------------- TOKEN GENERATION ---------------- */
@@ -389,7 +433,7 @@ exports.signIn = async function (req, res) {
 
         await redisClient.set(`AUTH_TOKEN:${user._id}`, tokenJwt);
 
-        return res.json({
+        return res.status(200).json({
             data: {
                 accessToken: tokenJwt,
                 tokenType: "Bearer",
@@ -400,14 +444,23 @@ exports.signIn = async function (req, res) {
                     isEmailVerified: user.isEmailVerified
                 }
             },
-            meta: { status: true, message: "Success" }
+            meta: {
+                message: "Success",
+                status_code: 200,
+                status: true
+            }
         });
 
     } catch (err) {
         console.error(err);
-        return res.status(500).json({
-            meta: { status: false, message: "Server error" }
+        return res.status(422).json({
+            'meta': {
+                'message': "Server error",
+                'status_code': 422,
+                'status': false,
+            }
         });
+
     }
 };
 
