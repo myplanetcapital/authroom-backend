@@ -21,13 +21,13 @@ let SEND_MAIL = require('../vendor/SendMail');
 
 async function key(kid) {
     const client = jwksClient({
-      jwksUri: "https://appleid.apple.com/auth/keys",
-      timeout: 30000
+        jwksUri: "https://appleid.apple.com/auth/keys",
+        timeout: 30000
     });
-  
+
     return await client.getSigningKey(kid);
 }
-
+/*
 exports.signIn = async function (req, res) {
 
     const fieldsValidation = new Validator(req.body, {
@@ -141,8 +141,7 @@ exports.signIn = async function (req, res) {
     }
 
 
-
-    let userData = await Users.findOne({"email":emailId});
+    let userData = await Users.findOne({"providerType":providerType,"providerUserId":providerUserId});
 
     if(userData){
 
@@ -170,9 +169,10 @@ exports.signIn = async function (req, res) {
         }
         
         let token = jwt.sign(encyToken,process.env.JWT_SECRET_KEY, {});
-        
-        let agentTokenKey = `AUTH_TOKEN:${String(userData._id)}`;
-        await redisClient.set(agentTokenKey, token);
+
+        let userTokenKey = `AUTH_TOKEN:${String(userData._id)}`;
+        await redisClient.set(userTokenKey, token);
+
         return res.status(200).json({
             "data": {
                 'accessToken': token,
@@ -195,41 +195,22 @@ exports.signIn = async function (req, res) {
 
     }else{
 
-        let insertAgentData = {
-            "email": getEmailId,
-            "providerData":getProviderObj,
-            "providerUserId":getProviderUserId,
-            "providerType":getProviderType,
-            "isEmailVerified": true,
-            "isFormSubmitted": false,
-            "verificationStatus": "PENDING" ,   
-            "notification.permission":true,
-            "notification.token":reqFcmToken
-
+        let insertUserData = {
+            "email": emailId,
+            "providerData":providerObj,
+            "providerUserId":providerUserId,
+            "providerType":providerType,
+            "isEmailVerified": false
         };
 
-        let saveAgentData = await Agents.create([insertAgentData]);
-        let getAgentData = saveAgentData[0];
+        let saveUserData = await Users.create([insertUserData]);
+        let userData = saveUserData[0];
 
-        let setTitle = "";
-        let setDesc = "";
-        if(getAgentData.verificationStatus == "PENDING"){
-            setTitle = "Identity Verification Request Submitted";
-            setDesc = "Your request to verify this account is currently under review. You can expect a response within 24 hours.";
-        }else if(getAgentData.verificationStatus == "SUCCESS"){
-            setTitle = "Identity Successfully Verified";
-            setDesc = "Thank you for completing our ID verification process. Please login to access your account.";
-        }else if(getAgentData.verificationStatus == "FAILED"){
-            setTitle = "Identity Verification Failed";
-            setDesc = "We were unable to verify your identity from the documents you submitted.";
-        }
-
+    
         let jwtTokenData = {
-            "_id": getAgentData._id,
-            "name": getAgentData.name,
-            "role": getAgentData.role,
-            "companyName": getAgentData.companyName,
-            "email": getAgentData.email,
+            "_id": userData._id,
+            "role": userData.role,
+            "email": userData.email
         };
 
         let encryptedToken = CryptoJS.AES.encrypt(JSON.stringify(jwtTokenData),process.env.CRYPTO_KEY, { vi: process.env.CRYPTO_VI }).toString();
@@ -237,29 +218,21 @@ exports.signIn = async function (req, res) {
             "encryptedToken": encryptedToken
         }
         
-        let token = jwt.sign(encyToken,process.env.JWT_SECRET_KEY, { expiresIn: '7h' });
+        let token = jwt.sign(encyToken,process.env.JWT_SECRET_KEY, {});
 
-        let agentTokenKey = `AUTH_TOKEN:${String(getAgentData._id)}`;
-        await redisClient.set(agentTokenKey, token);
+        let userTokenKey = `AUTH_TOKEN:${String(userData._id)}`;
+        await redisClient.set(userTokenKey, token);
 
         return res.status(200).json({
             "data": {
                 'accessToken': token,
                 'tokenType': 'Bearer',
                 'userDetail': {
-                    "id": getAgentData._id,
-                    "name": getAgentData.name,
-                    "companyName":getAgentData.companyName,
-                    "role":getAgentData.role,
-                    "email": getAgentData.email,
-                    "isFormSubmitted":getAgentData.isFormSubmitted,
-                    "isEmailVerified":getAgentData.isEmailVerified,
-                    "verificationStatus":getAgentData.verificationStatus,
-                    "isCompanyLicenceVerified":getAgentData.isCompanyLicenceVerified,
-                    "isProofOfAddressVerified":getAgentData.isProofOfAddressVerified,
-                },
-                "title":setTitle,
-                "description":setDesc
+                    "id": userData._id,
+                    "role":userData.role,
+                    "email": userData.email,
+                    "isEmailVerified":userData.isEmailVerified
+                }
             },
             'meta': {
                 'message': "Success.",
@@ -272,4 +245,169 @@ exports.signIn = async function (req, res) {
     }
    
 
-}
+}*/
+
+exports.signIn = async function (req, res) {
+    try {
+
+        const fieldsValidation = new Validator(req.body, {
+            providerType: 'required|in:GOOGLE,APPLE,EMAIL',
+            platform: 'required|in:ANDROID,IOS',
+            token: 'sometimes|required',
+            userInfo: 'sometimes|required',
+            'userInfo.email': 'sometimes|required|email',
+            otp: 'sometimes|required'
+        });
+
+        const isValidated = await fieldsValidation.check();
+
+        if (!isValidated) {
+
+            return res.status(422).json({
+                'meta': {
+                    'message': fieldsValidation.errors,
+                    'status_code': 422,
+                    'status': false,
+                }
+            });
+
+        }
+
+        const { providerType, token, platform, email, otp } = req.body;
+
+        let providerUserId;
+        let emailId;
+        let providerObj = {};
+
+        /* ---------------- SOCIAL LOGIN ---------------- */
+
+        if (providerType === "GOOGLE") {
+
+            const CLIENT_ID =
+                platform === "ANDROID"
+                    ? CLIENT_ID_GOOGLE_ANDROID
+                    : CLIENT_ID_GOOGLE_IOS;
+
+            const client = new OAuth2Client(CLIENT_ID);
+            const ticket = await client.verifyIdToken({
+                idToken: token,
+                audience: CLIENT_ID
+            });
+
+            const payload = ticket.payload;
+            providerUserId = payload.sub;
+            emailId = payload.email;
+            providerObj = payload;
+        }
+
+        if (providerType === "APPLE") {
+
+            const { header } = jwt.decode(token, { complete: true });
+            const publicKey = (await key(header.kid)).getPublicKey();
+
+            const decoded = jwt.verify(token, publicKey, { algorithms: ['RS256'] });
+
+            providerUserId = decoded.sub;
+            emailId = decoded.email || null; // Apple may hide email
+            providerObj = decoded;
+        }
+
+        /* ---------------- EMAIL OTP LOGIN ---------------- */
+
+        if (providerType === "EMAIL") {
+
+            if (!otp) {
+                await sendEmailOtp(email);
+                return res.json({
+                    meta: { status: true, message: "OTP sent to email" }
+                });
+            }
+
+            await verifyEmailOtp(email, otp);
+            providerUserId = email;
+            emailId = email;
+        }
+
+        /* ---------------- AUTH PROVIDER CHECK ---------------- */
+
+        let auth = await AuthProviders.findOne({
+            providerType,
+            providerUserId
+        });
+
+        let user;
+
+        if (auth) {
+            user = await Users.findById(auth.userId);
+        } else {
+
+            if (emailId) {
+                user = await Users.findOne({ email: emailId });
+            }
+
+            if (!user) {
+                user = await Users.create({
+                    email: emailId,
+                    isEmailVerified: providerType !== "EMAIL",
+                    status: "ACTIVE"
+                });
+            }
+
+            await AuthProviders.create({
+                userId: user._id,
+                providerType,
+                providerUserId,
+                providerData: providerObj
+            });
+        }
+
+        /* ---------------- ACCOUNT STATUS CHECK ---------------- */
+
+        if (user.status !== "ACTIVE") {
+            return res.status(403).json({
+                meta: { status: false, message: "Account locked" }
+            });
+        }
+
+        /* ---------------- TOKEN GENERATION ---------------- */
+
+        const jwtPayload = {
+            _id: user._id,
+            role: user.role,
+            email: user.email
+        };
+
+        const encrypted = CryptoJS.AES.encrypt(
+            JSON.stringify(jwtPayload),
+            process.env.CRYPTO_KEY
+        ).toString();
+
+        const tokenJwt = jwt.sign(
+            { encryptedToken: encrypted },
+            process.env.JWT_SECRET_KEY
+        );
+
+        await redisClient.set(`AUTH_TOKEN:${user._id}`, tokenJwt);
+
+        return res.json({
+            data: {
+                accessToken: tokenJwt,
+                tokenType: "Bearer",
+                userDetail: {
+                    id: user._id,
+                    email: user.email,
+                    role: user.role,
+                    isEmailVerified: user.isEmailVerified
+                }
+            },
+            meta: { status: true, message: "Success" }
+        });
+
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({
+            meta: { status: false, message: "Server error" }
+        });
+    }
+};
+

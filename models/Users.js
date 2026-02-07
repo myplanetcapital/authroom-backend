@@ -10,7 +10,7 @@ const UsersSchema = new Schema({
     notification: {
         permission: {
           type: Boolean,
-          default: true,
+          default: false,
         },
         token: {
           type: String,
@@ -19,7 +19,7 @@ const UsersSchema = new Schema({
     },
     isEmailVerified: { type: Boolean, default:false },
     passcode:{ type: String, default: null },
-    isSetPasscode:{ type: Boolean, default:true },
+    isSetPasscode:{ type: Boolean, default:false },
     status: { type: String, default: "ACTIVE" },
     providerData:{ type: Object, default: null },
     providerUserId:{ type: String, default: null },
