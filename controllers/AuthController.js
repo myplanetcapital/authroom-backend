@@ -338,7 +338,7 @@ exports.signIn = async function (req, res) {
                 providerUserId = decoded.sub;
                 emailId = decoded.email || null; // Apple may hide email
                 providerObj = decoded;
-                
+
             } catch (ex) {
 
                 return res.status(422).json({
@@ -463,7 +463,7 @@ exports.signIn = async function (req, res) {
             process.env.JWT_SECRET_KEY
         );
 
-        await redisClient.set(`AUTH_TOKEN:${user._id}`, tokenJwt);
+        //await redisClient.set(`AUTH_TOKEN:${user._id}`, tokenJwt);
 
         return res.status(200).json({
             data: {
