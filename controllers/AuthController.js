@@ -326,11 +326,11 @@ exports.signIn = async function (req, res) {
 
             if (!otp) {
                 await sendEmailOtp(email);
-                return res.status(422).json({
+                return res.status(200).json({
                     'meta': {
                         'message': "OTP sent to email",
-                        'status_code': 422,
-                        'status': false,
+                        'status_code': 200,
+                        'status': true,
                     }
                 });
             }
