@@ -2,6 +2,7 @@ const express = require('express');
 const ProtectedRoutes = express.Router();
 const Exchange = require('../vendor/Exchange');
 const AuthController = require('../controllers/AuthController');
+const QrcodeController = require('../controllers/QrcodeController');
 //const Auth = require('../vendor/Auth');
 
 module.exports=function(app){
@@ -22,7 +23,8 @@ module.exports=function(app){
 	//app.use('/api',Exchange.Validations.isAuthenticatedTraders);
 
 	app.post('/api/user/signIn',AuthController.signIn);
-	
+	app.post('/api/user/generateQRCode', QrcodeController.generateQRCode);
+	app.post('/api/user/verifyCode', QrcodeController.verifyCode);
 	
 	
 	
