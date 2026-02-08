@@ -5,7 +5,7 @@ const path = require("path");
 const Providers = require("../models/Providers");
 const { QRCodeStyling } = require('qr-code-styling/lib/qr-code-styling.common.js');
 const nodeCanvas = require('canvas');
-const  { JSDOM } = require('jsdom');
+const { JSDOM } = require('jsdom');
 const fs = require('fs');
 
 
@@ -17,11 +17,11 @@ const users = {};
 
 exports.generateQRCode = async (req, res) => {
 
-    const  username  = "test";
+    const username = "test";
     const secret = authenticator.generateSecret();
     users[username] = { secret };
     const otpauth = authenticator.keyuri(username, 'MyApp', secret);
-        
+
 
 
     const options = {
@@ -29,16 +29,29 @@ exports.generateQRCode = async (req, res) => {
         height: 300,
         data: otpauth,
         image: path.join(__basedir, "logo.png"),
-        dotsOptions: {
-            color: "#000000",
-            type: "rounded"
+        qrOptions: {
+            errorCorrectionLevel: "H"
         },
+        dotsOptions: {
+            type: "extra-rounded",   // ⬅ closest to abstract look
+            color: "#000000"
+        },
+        cornersSquareOptions: {
+            type: "extra-rounded",   // outer eye shape
+            color: "#000000"
+        },
+        cornersDotOptions: {
+            type: "dot",             // inner eye circle
+            color: "#000000"
+        },
+
         backgroundOptions: {
-            color: "#ffffff",
+            color: "#ffffff"
         },
         imageOptions: {
             crossOrigin: "anonymous",
-            margin: 20
+            margin: 12,              // logo safe zone
+            imageSize: 0.25
         }
     }
 
@@ -57,8 +70,8 @@ exports.generateQRCode = async (req, res) => {
     let finalBuffer = await qrCodeImage.getRawData("png");
 
     res.setHeader("Content-Type", "image/png");
-        res.setHeader("Cache-Control", "no-store");
-        return res.send(finalBuffer);
+    res.setHeader("Cache-Control", "no-store");
+    return res.send(finalBuffer);
 
 
 
