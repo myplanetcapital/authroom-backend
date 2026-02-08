@@ -19,6 +19,20 @@ const myCache = new NodeCache();
 let sendEmailOtp = require('../vendor/sendEmailOtp');
 let verifyEmailOtp = require('../vendor/verifyEmailOtp');
 
+async function verifyFacebookToken(userAccessToken) {
+  const appId = process.env.FACEBOOK_APP_ID;
+  const appSecret = process.env.FACEBOOK_APP_SECRET;
+
+  const appAccessToken = `${appId}|${appSecret}`;
+
+  const url = `https://graph.facebook.com/debug_token?input_token=${userAccessToken}&access_token=${appAccessToken}`;
+
+  console.log(url);
+
+  const response = await axios.get(url);
+
+  return response.data;
+}
 
 async function key(kid) {
     const client = jwksClient({
@@ -253,7 +267,7 @@ exports.signIn = async function (req, res) {
     try {
 
         const fieldsValidation = new Validator(req.body, {
-            providerType: 'required|in:GOOGLE,APPLE,EMAIL',
+            providerType: 'required|in:GOOGLE,APPLE,EMAIL,FACEBOOK',
             platform: 'required|in:ANDROID,IOS',
             token: 'required|sometimes',
             otp: 'required|sometimes',
@@ -342,6 +356,40 @@ exports.signIn = async function (req, res) {
                 return res.status(422).json({
                     'meta': {
                         'message': "Apple Token May be Expire.",
+                        'status_code': 422,
+                        'status': false,
+                    }
+                });
+
+            }
+        }
+
+         if (providerType === "FACEBOOK") {
+
+            try {
+
+                    const fbData = await verifyFacebookToken(token);
+
+                    console.log(fbData);
+
+                    if (!fbData.data.is_valid) {
+                        throw new Error("Invalid Facebook token");
+                    }
+
+                    console.log(fbData);
+
+                    const facebookUserId = fbData.data.user_id;
+                    providerUserId = facebookUserId;
+                    emailId = fbData.data.email || null;
+                    providerObj = fbData.data;
+
+                    return false;
+
+            } catch (ex) {
+                console.log(ex);
+                return res.status(422).json({
+                    'meta': {
+                        'message': "Facebook Token May be Expire Or Invalid.",
                         'status_code': 422,
                         'status': false,
                     }

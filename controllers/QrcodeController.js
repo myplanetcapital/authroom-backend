@@ -7,6 +7,7 @@ const { QRCodeStyling } = require('qr-code-styling/lib/qr-code-styling.common.js
 const nodeCanvas = require('canvas');
 const { JSDOM } = require('jsdom');
 const fs = require('fs');
+const { Validator } = require('node-input-validator');
 
 
 
@@ -17,20 +18,61 @@ const users = {};
 
 exports.generateQRCode = async (req, res) => {
 
-    const username = "test";
-    const secret = authenticator.generateSecret();
-    users[username] = { secret };
-    const otpauth = authenticator.keyuri(username, 'MyApp', secret);
+     const fieldsValidation = new Validator(req.body, {
+        providerId: 'required|string',
+    });
 
+    const isValidated = await fieldsValidation.check();
+
+    if (!isValidated) {
+
+        return res.status(422).json({
+            'meta': {
+                'message': fieldsValidation.errors,
+                'status_code': 422,
+                'status': false,
+            }
+        });
+
+    }
+
+    let reqProviderId = req.body.providerId
+
+    let providerData = await Providers.findOne({ providerId: reqProviderId });
+
+    if(!providerData){
+        return res.status(422).json({
+            'meta': {
+                'message': "Provider does not exist",
+                'status_code': 422,
+                'status': false,
+            }
+        }); 
+    }
+
+    let providerSecret = providerData.secret;
+    let providerAppName = providerData.appName;
+    let providerLogo = providerData.logo;
+
+
+    const userId = "698881f886cd2d5a4461604a";
+    const secret = authenticator.generateSecret();
+    
+    users[userId] = { secret };
+    const otpauth = authenticator.keyuri(userId, providerAppName, providerSecret);
+
+    console.log(otpauth);
 
 
     const options = {
         width: 300,
         height: 300,
+        shape: "square",
         data: otpauth,
-        image: path.join(__basedir, "logo.png"),
+        image: providerLogo,
         qrOptions: {
-            errorCorrectionLevel: "H"
+            errorCorrectionLevel: "Q",
+            margin: 0 
         },
         dotsOptions: {
             type: "extra-rounded",   // ⬅ closest to abstract look
@@ -49,12 +91,12 @@ exports.generateQRCode = async (req, res) => {
         },
         imageOptions: {
             crossOrigin: "anonymous",
-            margin: 12,              // logo safe zone
+            margin: 0,         // logo safe zone
             imageSize: 0.25
         }
     }
 
-    // For canvas type
+   
     const qrCodeImage = new QRCodeStyling({
         jsdom: JSDOM, // this is required
         nodeCanvas, // this is required,
@@ -62,7 +104,7 @@ exports.generateQRCode = async (req, res) => {
         imageOptions: {
             saveAsBlob: true,
             crossOrigin: "anonymous",
-            margin: 20
+            //margin: 3
         },
     });
 

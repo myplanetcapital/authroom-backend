@@ -5,9 +5,10 @@ const dataTables = require('mongoose-datatables');
 
 const ProvidersSchema = new Schema({
     _id: { type: Schema.ObjectId, auto: true },
-    name: { type: String, default: null },
+    appName: { type: String, default: null },
     logo: { type: String, default: null },
     url: { type: String, default: null },
+    secret: { type: String, default: null },
     providerId:{ type: String, default: null },
     status: { type: String, default: "ACTIVE" }
 }, {
