@@ -44,7 +44,6 @@ exports.generateQRCode = async (req, res) => {
             type: "dot",             // inner eye circle
             color: "#000000"
         },
-
         backgroundOptions: {
             color: "#ffffff"
         },
