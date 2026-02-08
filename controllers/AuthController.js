@@ -12,8 +12,8 @@ const { OAuth2Client } = require('google-auth-library');
 let generatorPass = require('generate-password');
 const otpGenerator = require('otp-generator');
 const jwksClient = require("jwks-rsa");
-const CLIENT_ID_GOOGLE_ANDROID = '970089445577-jkqobq31pl5gd8t41rkece7p476gq9a2.apps.googleusercontent.com';
-const CLIENT_ID_GOOGLE_IOS = '970089445577-go2bg010bh0ba7t86rde063oea94jvf6.apps.googleusercontent.com';
+const CLIENT_ID_GOOGLE_ANDROID = '559968810939-pk8itt3a951d8eo4dc38e4rf1qgci36a.apps.googleusercontent.com';
+const CLIENT_ID_GOOGLE_IOS = '559968810939-obhg9b5af7hg98tjej7eoiet2tmhkhv5.apps.googleusercontent.com';
 const NodeCache = require("node-cache");
 const myCache = new NodeCache();
 let sendEmailOtp = require('../vendor/sendEmailOtp');
@@ -327,9 +327,6 @@ exports.signIn = async function (req, res) {
         if (providerType === "APPLE") {
 
             try {
-
-
-
 
                 const { header } = jwt.decode(token, { complete: true });
                 const publicKey = (await key(header.kid)).getPublicKey();
