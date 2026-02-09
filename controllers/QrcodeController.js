@@ -3,6 +3,7 @@ const QRCode = require('qrcode');
 const sharp = require("sharp");
 const path = require("path");
 const Providers = require("../models/Providers");
+const OtpAuth = require("../models/OtpAuth");
 const { QRCodeStyling } = require('qr-code-styling/lib/qr-code-styling.common.js');
 const nodeCanvas = require('canvas');
 const { JSDOM } = require('jsdom');
@@ -10,16 +11,35 @@ const fs = require('fs');
 const { Validator } = require('node-input-validator');
 
 
+function decodeOtpauth(otpauth) {
+    const url = new URL(otpauth);
 
+    const type = url.hostname; // totp or hotp
 
+    // Decode label
+    const label = decodeURIComponent(url.pathname.slice(1));
+    const [issuerFromLabel, accountName] = label.includes(":")
+        ? label.split(":")
+        : [null, label];
 
-const users = {};
+    const params = Object.fromEntries(url.searchParams.entries());
 
+    return {
+        type,
+        accountName,
+        issuer: params.issuer || issuerFromLabel,
+        secret: params.secret,
+        digits: params.digits || 6,
+        period: params.period || 30,
+        algorithm: params.algorithm || "SHA1"
+    };
+}
 
 exports.generateQRCode = async (req, res) => {
 
-     const fieldsValidation = new Validator(req.body, {
+    const fieldsValidation = new Validator(req.body, {
         providerId: 'required|string',
+        userName: 'required|string',
     });
 
     const isValidated = await fieldsValidation.check();
@@ -37,32 +57,25 @@ exports.generateQRCode = async (req, res) => {
     }
 
     let reqProviderId = req.body.providerId
+    let reqUserName = req.body.userName;
 
     let providerData = await Providers.findOne({ providerId: reqProviderId });
 
-    if(!providerData){
+    if (!providerData) {
         return res.status(422).json({
             'meta': {
                 'message': "Provider does not exist",
                 'status_code': 422,
                 'status': false,
             }
-        }); 
+        });
     }
 
-    let providerSecret = providerData.secret;
     let providerAppName = providerData.appName;
     let providerLogo = providerData.logo;
 
-
-    const userId = "698881f886cd2d5a4461604a";
     const secret = authenticator.generateSecret();
-    
-    users[userId] = { secret };
-    const otpauth = authenticator.keyuri(userId, providerAppName, providerSecret);
-
-    console.log(otpauth);
-
+    const otpauth = authenticator.keyuri(reqUserName, providerAppName, secret);
 
     const options = {
         width: 300,
@@ -72,7 +85,7 @@ exports.generateQRCode = async (req, res) => {
         image: providerLogo,
         qrOptions: {
             errorCorrectionLevel: "Q",
-            margin: 0 
+            margin: 0
         },
         dotsOptions: {
             type: "extra-rounded",   // ⬅ closest to abstract look
@@ -96,7 +109,7 @@ exports.generateQRCode = async (req, res) => {
         }
     }
 
-   
+
     const qrCodeImage = new QRCodeStyling({
         jsdom: JSDOM, // this is required
         nodeCanvas, // this is required,
@@ -118,6 +131,72 @@ exports.generateQRCode = async (req, res) => {
 
 };
 
+exports.verifyCode = async (req, res) => {
+
+    let reqSecret = req.body.secret;
+    let code = req.body.code;
+   
+    const isValid = authenticator.check(code, reqSecret);
+
+    return res.status(200).json({
+        "isValid": isValid,
+        'meta': {
+            'message': "verify",
+            'status_code': 200,
+            'status': true,
+        }
+    });
+   
+
+}
+
+exports.saveData = async (req, res) => {
+
+    let reqQrData = req.body.qrData;
+    let reqUserId = req.body.userId;
+    let reqDeviceId = req.body.deviceId;
+
+    try {
+
+        const decodedAuth = decodeOtpauth(reqQrData);
+
+        let secret = decodedAuth.secret;
+        let userName = decodedAuth.accountName;
+        let issuer = decodedAuth.issuer;
+
+        await OtpAuth.create([{
+            qrUrl: reqQrData,
+            userId: reqUserId,
+            deviceId: reqDeviceId,
+            secret: secret,
+            userName: userName,
+            issuer: issuer,
+            qrObj: decodedAuth
+        }])
+
+
+        return res.status(200).json({
+            'meta': {
+                'message': "Auth Data Save",
+                'status_code': 200,
+                'status': true,
+            }
+        });
+    } catch (ex) {
+
+        console.log(ex);
+        return res.status(422).json({
+            'meta': {
+                'message': ex.message,
+                'status_code': 422,
+                'status': false,
+            }
+        });
+
+    }
+
+
+}
 
 
 /*exports.generateQRCode = async (req, res) => {
@@ -164,21 +243,6 @@ exports.generateQRCode = async (req, res) => {
         return res.send(finalBuffer);
 }*/
 
-
-
-
-
-exports.verifyCode = async (req, res) => {
-
-    const username = "test"
-    const token = req.body.token;
-    const user = users[username];
-    if (!user) return res.status(404).json({ valid: false, message: 'User not found' });
-
-    const isValid = authenticator.check(token, user.secret);
-    res.json({ valid: isValid });
-
-}
 
 
 /*

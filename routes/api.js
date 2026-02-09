@@ -22,9 +22,13 @@ module.exports=function(app){
 	app.use('/api',ProtectedRoutes);
 	//app.use('/api',Exchange.Validations.isAuthenticatedTraders);
 
-	app.post('/api/user/signIn',AuthController.signIn);
-	app.post('/api/user/generateQRCode', QrcodeController.generateQRCode);
-	app.post('/api/user/verifyCode', QrcodeController.verifyCode);
+	app.post('/api/auth/signIn',AuthController.signIn);
+	app.post('/api/auth/2fa/qr', QrcodeController.generateQRCode);
+	app.post('/api/auth/2fa/verify', QrcodeController.verifyCode);
+	app.post('/api/auth/2fa/saveData', QrcodeController.saveData);
+	//app.post('/api/auth/2fa/enable', QrcodeController.verifyCode);
+	//app.post('/api/auth/2fa/disable', QrcodeController.verifyCode);
+	//app.post('/api/auth/2fa/status', QrcodeController.verifyCode);
 	
 	
 	
