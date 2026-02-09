@@ -152,6 +152,26 @@ exports.verifyCode = async (req, res) => {
 
 exports.saveData = async (req, res) => {
 
+     const fieldsValidation = new Validator(req.body, {
+        qrData: 'required|string',
+        userId: 'required|sometimes|string',
+        deviceId: 'required|sometimes|string'
+    });
+
+    const isValidated = await fieldsValidation.check();
+
+    if (!isValidated) {
+
+        return res.status(422).json({
+            'meta': {
+                'message': fieldsValidation.errors,
+                'status_code': 422,
+                'status': false,
+            }
+        });
+
+    }
+
     let reqQrData = req.body.qrData;
     let reqUserId = req.body.userId;
     let reqDeviceId = req.body.deviceId;
