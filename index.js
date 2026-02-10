@@ -11,6 +11,7 @@ global.redisClient = asyncRedis.createClient(process.env.REDIS_PORT, process.env
 redisClient.on("error", function (err) {
     console.log("Error " + err);
 });
+const session = require('express-session');
 
 const options = {
    
@@ -41,6 +42,16 @@ app.get("/", function (req, res) {
 });
 
 
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'passkey_secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    secure: false,     // true only if HTTPS
+    maxAge: 5 * 60 * 1000 // 5 minutes
+  }
+}));
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));

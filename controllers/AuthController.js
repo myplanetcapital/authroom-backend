@@ -17,21 +17,32 @@ const CLIENT_ID_GOOGLE_IOS = '559968810939-n53urtm0b2n4h88q5p24bvvhulgfujrt.apps
 const NodeCache = require("node-cache");
 const myCache = new NodeCache();
 let sendEmailOtp = require('../vendor/sendEmailOtp');
+const crypto = require("crypto");
 let verifyEmailOtp = require('../vendor/verifyEmailOtp');
+const {
+    generateRegistrationOptions,
+    generateAuthenticationOptions,
+    verifyRegistrationResponse,
+    verifyAuthenticationResponse
+} = require('@simplewebauthn/server');
+
+const rpName = 'Auth Room';
+const rpID = 'authroom.com';
+const origin = 'https://api.authroom.com';
 
 async function verifyFacebookToken(userAccessToken) {
-  const appId = process.env.FACEBOOK_APP_ID;
-  const appSecret = process.env.FACEBOOK_APP_SECRET;
+    const appId = process.env.FACEBOOK_APP_ID;
+    const appSecret = process.env.FACEBOOK_APP_SECRET;
 
-  const appAccessToken = `${appId}|${appSecret}`;
+    const appAccessToken = `${appId}|${appSecret}`;
 
-  const url = `https://graph.facebook.com/debug_token?input_token=${userAccessToken}&access_token=${appAccessToken}`;
+    const url = `https://graph.facebook.com/debug_token?input_token=${userAccessToken}&access_token=${appAccessToken}`;
 
-  console.log(url);
+    console.log(url);
 
-  const response = await axios.get(url);
+    const response = await axios.get(url);
 
-  return response.data;
+    return response.data;
 }
 
 async function key(kid) {
@@ -267,7 +278,7 @@ exports.signIn = async function (req, res) {
     try {
 
         const fieldsValidation = new Validator(req.body, {
-            providerType: 'required|in:GOOGLE,APPLE,EMAIL,FACEBOOK',
+            providerType: 'required|in:GOOGLE,APPLE,EMAIL,FACEBOOK,PASSKEY',
             platform: 'required|in:ANDROID,IOS',
             token: 'required|sometimes',
             otp: 'required|sometimes',
@@ -364,26 +375,26 @@ exports.signIn = async function (req, res) {
             }
         }
 
-         if (providerType === "FACEBOOK") {
+        if (providerType === "FACEBOOK") {
 
             try {
 
-                    const fbData = await verifyFacebookToken(token);
+                const fbData = await verifyFacebookToken(token);
 
-                    console.log(fbData);
+                console.log(fbData);
 
-                    if (!fbData.data.is_valid) {
-                        throw new Error("Invalid Facebook token");
-                    }
+                if (!fbData.data.is_valid) {
+                    throw new Error("Invalid Facebook token");
+                }
 
-                    console.log(fbData);
+                console.log(fbData);
 
-                    const facebookUserId = fbData.data.user_id;
-                    providerUserId = facebookUserId;
-                    emailId = fbData.data.email || null;
-                    providerObj = fbData.data;
+                const facebookUserId = fbData.data.user_id;
+                providerUserId = facebookUserId;
+                emailId = fbData.data.email || null;
+                providerObj = fbData.data;
 
-                    return false;
+                return false;
 
             } catch (ex) {
                 console.log(ex);
@@ -398,12 +409,210 @@ exports.signIn = async function (req, res) {
             }
         }
 
+        if (providerType === "PASSKEY") {
+
+            let email = req.body.userInfo ? req.body.userInfo.email : null;
+            let deviceId = req.body.deviceId ? req.body.deviceId : null;
+            let passkeyResponse = req.body.passkeyResponse ? req.body.passkeyResponse : null;
+
+            if (!email || !deviceId) {
+                return res.status(422).json({
+                    meta: { message: "Email and deviceId required", status: false }
+                });
+            }
+
+            const userIdBuffer = crypto
+            .createHash("sha256")
+            .update(email)
+            .digest();
+
+            let user = await Users.findOne({ email });
+            let passkey = user?.passkeys.find(p => p.deviceId === deviceId);
+
+            /**
+             * ==================================================
+             * STEP 1️⃣ – NO passkeyResponse → send challenge
+             * ==================================================
+             */
+            if (!passkeyResponse) {
+
+                let options;
+
+                // 🆕 New device OR new user → registration
+                if (!passkey) {
+                    options = await generateRegistrationOptions({
+                        rpName: rpName,
+                        rpID,
+                        userID: userIdBuffer,
+                        userName: email,
+                        userDisplayName: email,
+                        timeout: 60000,
+                        authenticatorSelection: {
+                            residentKey: "preferred",
+                            userVerification: "preferred"
+                        }
+                    });
+                }
+
+                // 🔓 Existing device → authentication
+                else {
+                    options = await generateAuthenticationOptions({
+                        rpID,
+                        allowCredentials: [{
+                            id: passkey.credentialID,
+                            type: "public-key"
+                        }],
+                        userVerification: "preferred"
+                    });
+                }
+
+                console.log(req.session);
+                console.log(options);
+                // 🔐 Store challenge (Redis recommended)
+                req.session.passkeyChallenge = options.challenge;
+                req.session.passkeyEmail = email;
+                req.session.passkeyDeviceId = deviceId;
+
+                return res.status(200).json({
+                    meta: {
+                        message: "Passkey options",
+                        status: true
+                    },
+                    data: options
+                });
+            }
+
+            /**
+             * ==================================================
+             * STEP 2️⃣ – passkeyResponse → verify
+             * ==================================================
+             */
+
+            const expectedChallenge = req.session.passkeyChallenge;
+
+            if (!expectedChallenge) {
+                return res.status(422).json({
+                    meta: { message: "Challenge expired", status: false }
+                });
+            }
+
+            // 🔓 LOGIN
+            if (passkey) {
+
+                const verification = await verifyAuthenticationResponse({
+                    response: passkeyResponse,
+                    expectedChallenge,
+                    expectedOrigin: origin,
+                    expectedRPID: rpID,
+                    authenticator: {
+                        credentialID: passkey.credentialID,
+                        credentialPublicKey: passkey.publicKey,
+                        counter: passkey.counter
+                    }
+                });
+
+                if (!verification.verified) {
+                    return res.status(422).json({
+                        meta: { message: "Invalid passkey", status: false }
+                    });
+                }
+
+                passkey.counter = verification.authenticationInfo.newCounter;
+                passkey.lastUsedAt = new Date();
+                await user.save();
+            }
+
+            // 🆕 REGISTER
+            else {
+
+                const verification = await verifyRegistrationResponse({
+                    response: passkeyResponse,
+                    expectedChallenge,
+                    expectedOrigin: origin,
+                    expectedRPID: rpID
+                });
+
+                if (!verification.verified) {
+                    return res.status(422).json({
+                        meta: { message: "Passkey registration failed", status: false }
+                    });
+                }
+
+                const { credentialPublicKey, credentialID, counter } =
+                    verification.registrationInfo;
+
+                if (!user) {
+                    user = await Users.create({
+                        email,
+                        providerType: "PASSKEY",
+                        isEmailVerified: true,
+                        passkeys: []
+                    });
+                }
+
+                user.passkeys.push({
+                    deviceId,
+                    credentialID,
+                    publicKey: credentialPublicKey,
+                    counter,
+                    platform,
+                    deviceName: req.headers["user-agent"]
+                });
+                user.passkeyUserId = userIdBuffer;
+                await user.save();
+            }
+
+            // 🧹 Cleanup
+            delete req.session.passkeyChallenge;
+
+            /**
+             * ==================================================
+             * STEP 3️⃣ – JWT ISSUE (your existing logic)
+             * ==================================================
+             */
+
+            const jwtPayload = {
+                _id: user._id,
+                role: user.role,
+                email: user.email
+            };
+
+            const encrypted = CryptoJS.AES.encrypt(
+                JSON.stringify(jwtPayload),
+                process.env.CRYPTO_KEY
+            ).toString();
+
+            const tokenJwt = jwt.sign(
+                { encryptedToken: encrypted },
+                process.env.JWT_SECRET_KEY
+            );
+
+            return res.status(200).json({
+                data: {
+                    accessToken: tokenJwt,
+                    tokenType: "Bearer",
+                    userDetail: {
+                        id: user._id,
+                        email: user.email,
+                        role: user.role
+                    }
+                },
+                meta: {
+                    message: "Success",
+                    status: true,
+                    status_code: 200
+                }
+            });
+        }
+
+
+
         /* ---------------- EMAIL OTP LOGIN ---------------- */
         let isEmailOtpVerified = false;
         if (providerType === "EMAIL") {
 
             if (!otp) {
-                let isUserExists = await Users.findOne({ email: email , providerType: "EMAIL" });
+                let isUserExists = await Users.findOne({ email: email, providerType: "EMAIL" });
                 await sendEmailOtp(email, isUserExists ? "LOGIN" : "REGISTER");
                 return res.status(200).json({
                     'meta': {
