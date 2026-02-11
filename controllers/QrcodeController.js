@@ -35,27 +35,7 @@ function decodeOtpauth(otpauth) {
     };
 }
 
-async function convertSvgBase64ToPng(base64Svg) {
-    const base64Data = base64Svg.replace(/^data:image\/svg\+xml;base64,/, "");
-    let svgString = Buffer.from(base64Data, "base64").toString("utf8");
 
-    // If width/height missing → inject them
-    if (!svgString.includes("width=") || !svgString.includes("height=")) {
-        svgString = svgString.replace(
-            "<svg",
-            '<svg width="500" height="500"'
-        );
-    }
-
-    const svgBuffer = Buffer.from(svgString);
-
-    const pngBuffer = await sharp(svgBuffer)
-        .resize(200, 200)
-        .png()
-        .toBuffer();
-
-    return pngBuffer;
-}
 
 exports.generateQRCode = async (req, res) => {
 
@@ -96,9 +76,38 @@ exports.generateQRCode = async (req, res) => {
     let providerAppName = providerData.appName;
     let providerLogo = providerData.logo;
 
-    let logoBuffer = await convertSvgBase64ToPng(providerLogo);
+    let logoBuffer;
 
-    
+    if (providerLogo.startsWith("data:image/svg+xml")) {
+        // Base64 SVG
+        const base64Data = providerLogo.replace(/^data:image\/svg\+xml;base64,/, "");
+        const svgBuffer = Buffer.from(base64Data, "base64");
+
+        logoBuffer = await sharp(svgBuffer)
+            .resize(200, 200)
+            .png()
+            .toBuffer();
+
+    } else if (providerLogo.startsWith("http")) {
+        const axios = require("axios");
+        const response = await axios.get(providerLogo, {
+            responseType: "arraybuffer"
+        });
+
+        logoBuffer = await sharp(response.data)
+            .resize(200, 200)
+            .png()
+            .toBuffer();
+
+    } else {
+        const fs = require("fs");
+        const fileBuffer = fs.readFileSync(providerLogo);
+
+        logoBuffer = await sharp(fileBuffer)
+            .resize(200, 200)
+            .png()
+            .toBuffer();
+    }
 
     const secret = authenticator.generateSecret();
     const otpauth = authenticator.keyuri(reqUserName, providerAppName, secret);
