@@ -37,6 +37,7 @@ function decodeOtpauth(otpauth) {
 
 
 
+
 exports.generateQRCode = async (req, res) => {
 
     const fieldsValidation = new Validator(req.body, {
