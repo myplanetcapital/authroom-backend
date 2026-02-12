@@ -141,7 +141,7 @@ exports.generateQRCode = async (req, res) => {
             color: "#ffffff"
         },
         imageOptions: {
-            crossOrigin: "anonymous",
+            //crossOrigin: "anonymous",
             margin: 0,         // logo safe zone
             imageSize: 0.25
         }
