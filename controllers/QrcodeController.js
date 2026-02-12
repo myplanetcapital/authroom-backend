@@ -142,7 +142,7 @@ exports.generateQRCode = async (req, res) => {
         },
         imageOptions: {
             //crossOrigin: "anonymous",
-            margin: 0,         // logo safe zone
+            margin: 8,         // logo safe zone
             imageSize: 0.25
         }
     }
