@@ -122,7 +122,7 @@ exports.generateQRCode = async (req, res) => {
         data: otpauth,
         image: logoBase64,
         qrOptions: {
-            errorCorrectionLevel: "Q",
+            errorCorrectionLevel: "H",
             margin: 0
         },
         dotsOptions: {
