@@ -118,7 +118,7 @@ exports.generateQRCode = async (req, res) => {
         height: 200,
         shape: "square",
         data: otpauth,
-        image: logoBuffer,
+        image: __basedir + "/logo.png",
         qrOptions: {
             errorCorrectionLevel: "Q",
             margin: 0
