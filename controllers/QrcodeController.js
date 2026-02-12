@@ -159,9 +159,27 @@ exports.generateQRCode = async (req, res) => {
 
     let finalBuffer = await qrCodeImage.getRawData("png");
 
+    const base64Image = finalBuffer.toString("base64");
+
+    const base64WithPrefix = `data:image/png;base64,${base64Image}`;
+
+    return res.status(200).json({
+         data: {
+            qrImage: base64WithPrefix,
+            otpauth: otpauth
+        },
+        meta: {
+            message: "QR generated successfully",
+            status_code: 200,
+            status: true,
+        }
+       
+    });
+
+    /*
     res.setHeader("Content-Type", "image/png");
     res.setHeader("Cache-Control", "no-store");
-    return res.send(finalBuffer);
+    return res.send(finalBuffer);*/
 
 
 
