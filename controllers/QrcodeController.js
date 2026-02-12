@@ -114,8 +114,8 @@ exports.generateQRCode = async (req, res) => {
     const otpauth = authenticator.keyuri(reqUserName, providerAppName, secret);
 
     const options = {
-        width: 300,
-        height: 300,
+        width: 200,
+        height: 200,
         shape: "square",
         data: otpauth,
         image: logoBuffer,
