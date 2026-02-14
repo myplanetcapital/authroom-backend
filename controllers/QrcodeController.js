@@ -121,7 +121,7 @@ exports.generateQRCode = async (req, res) => {
         height: 200,
         shape: "square",
         data: otpauth,
-       // image: logoBase64,
+        image: logoBase64,
         qrOptions: {
             errorCorrectionLevel: "H",
             margin: 0
@@ -140,11 +140,6 @@ exports.generateQRCode = async (req, res) => {
         },
         backgroundOptions: {
             color: "#ffffff"
-        },
-        imageOptions: {
-            //crossOrigin: "anonymous",
-            margin: 8,         // logo safe zone
-            imageSize: 0.25
         }
     }
 
@@ -154,9 +149,8 @@ exports.generateQRCode = async (req, res) => {
         nodeCanvas, // this is required,
         ...options,
         imageOptions: {
-            saveAsBlob: true,
-            crossOrigin: "anonymous",
-            //margin: 3
+            margin: 10,
+            imageSize: 0.25
         },
     });
 
