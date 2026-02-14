@@ -120,7 +120,7 @@ exports.generateQRCode = async (req, res) => {
         height: 200,
         shape: "square",
         data: otpauth,
-        //image: logoBase64,
+        image: logoBase64,
         qrOptions: {
             errorCorrectionLevel: "H",
             margin: 0
@@ -168,7 +168,9 @@ exports.generateQRCode = async (req, res) => {
     return res.status(200).json({
          data: {
             qrImage: base64WithPrefix,
-            otpauth: otpauth
+            otpauth: otpauth,
+            appName:providerAppName,
+            secret:secret
         },
         meta: {
             message: "QR generated successfully",
