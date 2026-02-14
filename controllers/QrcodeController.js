@@ -116,14 +116,14 @@ exports.generateQRCode = async (req, res) => {
 
     //const logoBase64 = `data:image/png;base64,${logoBuffer.toString("base64")}`;
 
-    const logoPath = path.join(__basedir, "logo.png");
+   // const logoPath = path.join(__basedir, "logo.png");
 
     const options = {
         width: 200,
         height: 200,
         shape: "square",
         data: otpauth,
-        image: logoPath,
+        //image: logoPath,
         qrOptions: {
             errorCorrectionLevel: "H",
             margin: 0
