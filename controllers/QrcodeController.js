@@ -113,6 +113,7 @@ exports.generateQRCode = async (req, res) => {
     const secret = authenticator.generateSecret();
     const otpauth = authenticator.keyuri(reqUserName, providerAppName, secret);
 
+    
     const logoBase64 = `data:image/png;base64,${logoBuffer.toString("base64")}`;
 
     const options = {
