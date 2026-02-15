@@ -19,7 +19,7 @@ const UsersSchema = new Schema({
     },
     passkeyUserId: {
         type: Buffer,
-        required: true
+        default: null
     },
     passkeys: [
         {
