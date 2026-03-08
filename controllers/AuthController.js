@@ -19,6 +19,7 @@ const myCache = new NodeCache();
 let sendEmailOtp = require('../vendor/sendEmailOtp');
 const crypto = require("crypto");
 let verifyEmailOtp = require('../vendor/verifyEmailOtp');
+
 const {
     generateRegistrationOptions,
     generateAuthenticationOptions,
@@ -273,6 +274,126 @@ exports.signIn = async function (req, res) {
 
 }*/
 
+exports.startRegistration = async function (req, res) {
+
+    let email = req.body.userInfo ? req.body.userInfo.email : null;
+    let deviceId = req.body.deviceId ? req.body.deviceId : null;
+
+    if (!email || !deviceId) {
+        return res.status(422).json({
+            meta: {
+                message: "Email and deviceId required",
+                status_code: 422,
+                status: false,
+            }
+
+        });
+
+    }
+
+    let user = await Users.findOne({ "email": email });
+
+    if (!user) {
+        user = await Users.create({
+            email: email,
+            providerType: "EMAIL",
+            isEmailVerified: true
+        });
+    }
+
+    if (!user.passkeyUserId) {
+        user.passkeyUserId = Buffer.from(user._id.toString());
+        await user.save();
+    }
+
+
+    const userIdBuffer = Buffer.from(user._id.toString());
+
+    const options = await generateRegistrationOptions({
+        rpName: rpName,
+        rpID: rpID,
+        userID: userIdBuffer,
+        userName: email,
+        userDisplayName: email,
+        timeout: 60000,
+        attestationType: "none",
+        authenticatorSelection: {
+           residentKey: 'required',
+            userVerification: 'required',
+            authenticatorAttachment: 'platform',
+            requireResidentKey: false,
+        }
+    });
+
+    console.log(`PASSKEY_CHALLENGE:${userIdBuffer}`);
+
+    await redisClient.setex(
+        `PASSKEY_CHALLENGE:${email}`,
+        300,
+        options.challenge
+    );
+
+   
+    return res.json(options);
+
+
+
+}
+
+exports.verifyRegistration = async function (req, res) {
+
+    const body = req.body;
+
+    let userId = body.user.name;
+
+    console.log(req.session);
+  
+    console.log(`PASSKEY_CHALLENGE:${userId}`);
+
+    const expectedChallenge = await redisClient.get(
+        `PASSKEY_CHALLENGE:${userId}`
+    );
+
+      console.log(expectedChallenge);
+
+    if (!expectedChallenge) {
+        return res.status(422).json({
+            meta: { message: "Challenge expired", status: false }
+        });
+    }
+
+    const verification = await verifyRegistrationResponse({
+        response: body,
+        expectedChallenge: req.session.challenge,
+        expectedOrigin: origin,
+        expectedRPID: rpID
+    });
+
+
+
+    if (verification.verified) {
+
+        const { credentialPublicKey, credentialID, counter } =
+            verification.registrationInfo;
+
+        const user = await Users.findById(req.body.userId);
+
+        user.credentials.push({
+            credentialID: credentialID.toString("base64"),
+            publicKey: credentialPublicKey.toString("base64"),
+            counter
+        });
+
+        await user.save();
+
+        res.json({ verified: true });
+    }
+
+    res.json({ verified: false });
+
+}
+
+
 exports.signIn = async function (req, res) {
 
     try {
@@ -409,6 +530,7 @@ exports.signIn = async function (req, res) {
             }
         }
 
+        /*
         if (providerType === "PASSKEY") {
 
             let email = req.body.userInfo ? req.body.userInfo.email : null;
@@ -429,11 +551,7 @@ exports.signIn = async function (req, res) {
             let user = await Users.findOne({ email });
             let passkey = user?.passkeys.find(p => p.deviceId === deviceId);
 
-            /**
-             * ==================================================
-             * STEP 1️⃣ – NO passkeyResponse → send challenge
-             * ==================================================
-             */
+            
             if (!passkeyResponse) {
 
                 let options;
@@ -482,11 +600,7 @@ exports.signIn = async function (req, res) {
                 });
             }
 
-            /**
-             * ==================================================
-             * STEP 2️⃣ – passkeyResponse → verify
-             * ==================================================
-             */
+          
 
             const expectedChallenge = req.session.passkeyChallenge;
 
@@ -565,11 +679,7 @@ exports.signIn = async function (req, res) {
             // 🧹 Cleanup
             delete req.session.passkeyChallenge;
 
-            /**
-             * ==================================================
-             * STEP 3️⃣ – JWT ISSUE (your existing logic)
-             * ==================================================
-             */
+          
 
             const jwtPayload = {
                 _id: user._id,
@@ -603,7 +713,7 @@ exports.signIn = async function (req, res) {
                     status_code: 200
                 }
             });
-        }
+        }*/
 
 
 

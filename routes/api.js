@@ -22,6 +22,9 @@ module.exports=function(app){
 	app.use('/api',ProtectedRoutes);
 	//app.use('/api',Exchange.Validations.isAuthenticatedTraders);
 
+	
+	app.post('/api/auth/startRegistration',AuthController.startRegistration);
+	app.post('/api/auth/verifyRegistration',AuthController.verifyRegistration);
 	app.post('/api/auth/signIn',AuthController.signIn);
 	app.post('/api/auth/2fa/qr', QrcodeController.generateQRCode);
 	app.post('/api/auth/2fa/verify', QrcodeController.verifyCode);

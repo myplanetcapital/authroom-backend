@@ -3,6 +3,14 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 const dataTables = require('mongoose-datatables');
 
+const CredentialSchema = new mongoose.Schema({
+  credentialID: String,
+  publicKey: String,
+  counter: Number,
+  transports: [String]
+});
+
+
 const UsersSchema = new Schema({
     _id: { type: Schema.ObjectId, auto: true },
     email: { type: String, default: null },
@@ -21,18 +29,7 @@ const UsersSchema = new Schema({
         type: Buffer,
         default: null
     },
-    passkeys: [
-        {
-            deviceId: { type: String, index: true },
-            credentialID: Buffer,
-            publicKey: Buffer,
-            counter: Number,
-            platform: String,
-            deviceName: String,
-            lastUsedAt: Date,
-            createdAt: { type: Date, default: Date.now }
-        }
-    ],
+    credentials: [CredentialSchema],
     isEmailVerified: { type: Boolean, default: false },
     passcode: { type: String, default: null },
     isSetPasscode: { type: Boolean, default: false },

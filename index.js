@@ -41,7 +41,6 @@ app.get("/", function (req, res) {
     });
 });
 
-
 app.use(session({
   secret: process.env.SESSION_SECRET || 'passkey_secret',
   resave: false,
@@ -53,11 +52,14 @@ app.use(session({
   }
 }));
 
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 require('./routes/api')(app);
 app.use(compression());
+
+
 
 app.listen(process.env.NODE_SERVER_PORT, function () {
     
