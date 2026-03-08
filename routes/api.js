@@ -25,6 +25,8 @@ module.exports=function(app){
 	
 	app.post('/api/auth/startRegistration',AuthController.startRegistration);
 	app.post('/api/auth/verifyRegistration',AuthController.verifyRegistration);
+	app.post('/api/auth/startLogin',AuthController.startLogin);
+	app.post('/api/auth/verifyLogin',AuthController.verifyLogin);
 	app.post('/api/auth/signIn',AuthController.signIn);
 	app.post('/api/auth/2fa/qr', QrcodeController.generateQRCode);
 	app.post('/api/auth/2fa/verify', QrcodeController.verifyCode);

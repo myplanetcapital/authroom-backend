@@ -29,7 +29,8 @@ const {
 
 const rpName = 'Auth Room';
 const rpID = 'authroom.com';
-const origin = 'https://api.authroom.com';
+const origin = 'https://authroom.com';
+const users = new Map();
 
 async function verifyFacebookToken(userAccessToken) {
     const appId = process.env.FACEBOOK_APP_ID;
@@ -325,7 +326,7 @@ exports.startRegistration = async function (req, res) {
         }
     });
 
-    console.log(`PASSKEY_CHALLENGE:${userIdBuffer}`);
+    console.log(`PASSKEY_CHALLENGE:${email}`);
 
     await redisClient.setex(
         `PASSKEY_CHALLENGE:${email}`,
@@ -342,19 +343,16 @@ exports.startRegistration = async function (req, res) {
 
 exports.verifyRegistration = async function (req, res) {
 
-    const body = req.body;
+    const reqAttestationResponse = req.body.attestationResponse;
+    let email = req.body.userInfo ? req.body.userInfo.email : null;
 
-    let userId = body.user.name;
-
-    console.log(req.session);
-  
-    console.log(`PASSKEY_CHALLENGE:${userId}`);
+   
 
     const expectedChallenge = await redisClient.get(
-        `PASSKEY_CHALLENGE:${userId}`
+        `PASSKEY_CHALLENGE:${email}`
     );
 
-      console.log(expectedChallenge);
+     
 
     if (!expectedChallenge) {
         return res.status(422).json({
@@ -362,13 +360,19 @@ exports.verifyRegistration = async function (req, res) {
         });
     }
 
-    const verification = await verifyRegistrationResponse({
-        response: body,
-        expectedChallenge: req.session.challenge,
+     console.log({
+        response: reqAttestationResponse,
+        expectedChallenge: expectedChallenge,
         expectedOrigin: origin,
         expectedRPID: rpID
     });
 
+    const verification = await verifyRegistrationResponse({
+        response: body,
+        expectedChallenge: expectedChallenge,
+        expectedOrigin: origin,
+        expectedRPID: rpID
+    });
 
 
     if (verification.verified) {
@@ -390,6 +394,82 @@ exports.verifyRegistration = async function (req, res) {
     }
 
     res.json({ verified: false });
+
+}
+
+exports.startLogin = async function (req, res) {
+
+     const { username } = req.body;
+
+  const user = users.get(username);
+
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  const options = await generateAuthenticationOptions({
+
+    timeout: 60000,
+
+    rpID,
+
+    allowCredentials: user.devices.map(device => ({
+      id: device.credentialID,
+      type: "public-key",
+      transports: device.transports
+    })),
+
+    userVerification: "preferred"
+  });
+
+  user.currentChallenge = options.challenge;
+
+  res.json(options);
+
+}
+
+exports.verifyLogin = async function (req, res) {
+
+    const { username, assertionResponse } = req.body;
+
+  const user = users.get(username);
+
+  const device = user.devices.find(dev =>
+    dev.credentialID.equals(Buffer.from(assertionResponse.rawId, "base64url"))
+  );
+
+  if (!device) {
+    return res.status(400).json({ error: "Device not found" });
+  }
+
+  let verification;
+
+  try {
+
+    verification = await verifyAuthenticationResponse({
+
+      response: assertionResponse,
+
+      expectedChallenge: user.currentChallenge,
+
+      expectedOrigin: origin,
+
+      expectedRPID: rpID,
+
+      authenticator: device
+    });
+
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const { verified, authenticationInfo } = verification;
+
+  if (verified) {
+    device.counter = authenticationInfo.newCounter;
+  }
+
+  res.json({ verified });
 
 }
 
