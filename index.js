@@ -52,6 +52,10 @@ app.use(session({
   }
 }));
 
+app.use(
+  "/.well-known",
+  express.static(path.join(__dirname, ".well-known"))
+);
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));

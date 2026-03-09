@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const ProtectedRoutes = express.Router();
 const Exchange = require('../vendor/Exchange');
 const AuthController = require('../controllers/AuthController');
@@ -22,7 +23,9 @@ module.exports=function(app){
 	app.use('/api',ProtectedRoutes);
 	//app.use('/api',Exchange.Validations.isAuthenticatedTraders);
 
-	
+
+
+
 	app.post('/api/auth/startRegistration',AuthController.startRegistration);
 	app.post('/api/auth/verifyRegistration',AuthController.verifyRegistration);
 	app.post('/api/auth/startLogin',AuthController.startLogin);

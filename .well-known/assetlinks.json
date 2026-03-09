@@ -1,0 +1,15 @@
+[
+  {
+      "relation": [
+          "delegate_permission/common.handle_all_urls",
+          "delegate_permission/common.get_login_creds"
+      ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "auth_rooms.android",
+      "sha256_cert_fingerprints": [
+        "5F:03:D8:D3:78:4B:73:18:CF:11:66:58:68:B3:91:8A:2F:55:8E:A8:CD:F2:27:88:43:46:1F:4B:A1:50:AE:EE"
+      ]
+    }
+  }
+]
