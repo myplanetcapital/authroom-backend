@@ -28,7 +28,7 @@ const {
 } = require('@simplewebauthn/server');
 
 const rpName = 'Auth Room';
-const rpID = 'authroom.com';
+const rpID = 'api.authroom.com';
 const origin = 'https://authroom.com';
 const users = new Map();
 
