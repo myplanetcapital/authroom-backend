@@ -53,7 +53,7 @@ app.use(session({
 }));
 
 app.use(
-  "/api/.well-known",
+  "/.well-known",
   express.static(path.join(__dirname, ".well-known"))
 );
 
