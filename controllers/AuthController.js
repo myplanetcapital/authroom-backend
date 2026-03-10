@@ -457,7 +457,7 @@ exports.verifyLogin = async function (req, res) {
         return res.status(404).json({ error: "User not found" });
     }
 
-    const credential = user.credentials.find(
+    const credential = userData.credentials.find(
         c => c.credentialID === req.body.id
     );
 
@@ -475,7 +475,7 @@ exports.verifyLogin = async function (req, res) {
 
    if (verification.verified) {
     credential.counter = verification.authenticationInfo.newCounter;
-    await user.save();
+    await userData.save();
 
     return res.json({ verified: true });
   } else {
