@@ -371,7 +371,8 @@ exports.verifyRegistration = async function (req, res) {
         const { credential } = verification.registrationInfo;
         let credentialPublicKey = credential.publicKey;
         let credentialID = credential.id;
-        let counter = credential.counter
+        let counter = credential.counter;
+        let transports = credential.transports;
 
         const user = await Users.findOne({ "email": email });
 
@@ -382,7 +383,8 @@ exports.verifyRegistration = async function (req, res) {
         user.credentials.push({
             credentialID: credentialID.toString("base64"),
             publicKey: credentialPublicKey.toString("base64"),
-            counter
+            counter,
+            transports
         });
 
         await user.save();
