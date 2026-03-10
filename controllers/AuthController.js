@@ -454,7 +454,7 @@ exports.verifyLogin = async function (req, res) {
     let reqId = reqAttestationResponse.id;
     let email = req.body.userInfo ? req.body.userInfo.email : null;
 
-    const expectedChallenge = "i9YZGlzF4y2IEQEkVYX0sj8pNmhfRGT7R2RTuPTJgzc";//await redisClient.get(`PASSKEY_CHALLENGE:${email}`);
+    const expectedChallenge = await redisClient.get(`PASSKEY_CHALLENGE:${email}`);
 
      if (!expectedChallenge) {
         return res.status(422).json({
