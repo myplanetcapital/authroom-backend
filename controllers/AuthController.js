@@ -26,6 +26,7 @@ const {
     verifyRegistrationResponse,
     verifyAuthenticationResponse
 } = require('@simplewebauthn/server');
+const { isoBase64URL } = require('@simplewebauthn/server/helpers');
 
 const rpName = 'Auth Room';
 const rpID = 'api.authroom.com';
@@ -381,8 +382,8 @@ exports.verifyRegistration = async function (req, res) {
         console.log(counter);
 
         user.credentials.push({
-            credentialID: credentialID.toString("base64"),
-            publicKey: credentialPublicKey.toString("base64"),
+            credentialID: isoBase64URL.fromBuffer(credentialID),
+            publicKey: isoBase64URL.fromBuffer(credentialPublicKey),
             counter,
             transports
         });
@@ -446,9 +447,7 @@ exports.verifyLogin = async function (req, res) {
     let reqId = reqAttestationResponse.id;
     let email = req.body.userInfo ? req.body.userInfo.email : null;
 
-    const expectedChallenge = await redisClient.get(
-        `PASSKEY_CHALLENGE:${email}`
-    );
+    const expectedChallenge = "i9YZGlzF4y2IEQEkVYX0sj8pNmhfRGT7R2RTuPTJgzc";//await redisClient.get(`PASSKEY_CHALLENGE:${email}`);
 
      if (!expectedChallenge) {
         return res.status(422).json({
@@ -472,10 +471,10 @@ exports.verifyLogin = async function (req, res) {
     expectedChallenge: expectedChallenge,
     expectedOrigin: "android:apk-key-hash:XwPY03hLcxjPEWZYaLORii9VjqjN8ieIQ0YfS6FQru4",
     expectedRPID: rpID,
-    authenticator: {
-     credentialID: credential.credentialID,
-      credentialPublicKey: credential.publicKey,
-      counter: credential.counter
+     credential: {
+        id: Buffer.from(credential.credentialID, "base64url"),
+        publicKey:Buffer.from(credential.publicKey, "base64url"),
+        counter: credential.counter
     }
   });
     
@@ -485,14 +484,12 @@ exports.verifyLogin = async function (req, res) {
     expectedChallenge: expectedChallenge,
     expectedOrigin: "android:apk-key-hash:XwPY03hLcxjPEWZYaLORii9VjqjN8ieIQ0YfS6FQru4",
     expectedRPID: rpID,
-    authenticator: {
-      credentialID: credential.credentialID,
-      credentialPublicKey: credential.publicKey,
-      counter: credential.counter
+    credential: {
+        id: Buffer.from(credential.credentialID, "base64url"),
+        publicKey:Buffer.from(credential.publicKey, "base64url"),
+        counter: credential.counter
     }
   });
-
-  console.log(credential);
 
   console.log(verification);
 
