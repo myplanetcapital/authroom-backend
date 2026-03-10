@@ -467,6 +467,17 @@ exports.verifyLogin = async function (req, res) {
     );
 
    
+    console.log({
+    response: reqAttestationResponse,
+    expectedChallenge: expectedChallenge,
+    expectedOrigin: "android:apk-key-hash:XwPY03hLcxjPEWZYaLORii9VjqjN8ieIQ0YfS6FQru4",
+    expectedRPID: rpID,
+    authenticator: {
+      credentialID: Buffer.from(credential.credentialID, "base64"),
+      credentialPublicKey: Buffer.from(credential.publicKey, "base64"),
+      counter: credential.counter
+    }
+  });
     
 
     const verification = await verifyAuthenticationResponse({
