@@ -373,7 +373,7 @@ exports.verifyRegistration = async function (req, res) {
     const verification = await verifyRegistrationResponse({
         response: reqAttestationResponse,
         expectedChallenge: expectedChallenge,
-        expectedOrigin: "android:apk-key-hash:XwPY03hLcxjPEWZYaLORii9VjqjN8ieIQ0YfS6FQru4=",
+        expectedOrigin: "android:apk-key-hash:XwPY03hLcxjPEWZYaLORii9VjqjN8ieIQ0YfS6FQru4",
         expectedRPID: rpID
     });
 
