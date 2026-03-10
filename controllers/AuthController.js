@@ -352,6 +352,9 @@ exports.verifyRegistration = async function (req, res) {
         `PASSKEY_CHALLENGE:${email}`
     );
 
+    console.log(`PASSKEY_CHALLENGE:${email}`);
+    console.log(expectedChallenge);
+
      
 
     if (!expectedChallenge) {
@@ -368,7 +371,7 @@ exports.verifyRegistration = async function (req, res) {
     });
 
     const verification = await verifyRegistrationResponse({
-        response: body,
+        response: reqAttestationResponse,
         expectedChallenge: expectedChallenge,
         expectedOrigin: origin,
         expectedRPID: rpID
