@@ -406,7 +406,7 @@ exports.verifyRegistration = async function (req, res) {
         let counter = credential.counter;
         let transports = credential.transports;
 
-        const userData = await Users.findOne({ "email": email });
+        const userData = await Users.findOne({ "email": email, providerType: "PASSKEY" });
 
         userData.credentials.push({
             credentialID: credentialID,
@@ -471,7 +471,7 @@ exports.startLogin = async function (req, res) {
 
     let email = req.body.userInfo ? req.body.userInfo.email : null;
 
-    const userData = await Users.findOne({ "email": email });
+    const userData = await Users.findOne({ "email": email, providerType: "PASSKEY" });
 
     if (!userData) {
 
@@ -525,7 +525,7 @@ exports.startLogin = async function (req, res) {
 
 exports.verifyLogin = async function (req, res) {
 
-     const fieldsValidation = new Validator(req.body, {
+    const fieldsValidation = new Validator(req.body, {
         "attestationResponse": 'required',
         "deviceId": 'required|string',
         "platform": 'required|in:ANDROID,IOS',
@@ -554,17 +554,17 @@ exports.verifyLogin = async function (req, res) {
 
     if (!expectedChallenge) {
 
-         return res.status(422).json({
+        return res.status(422).json({
             'meta': {
                 'message': "Challenge not found or may expired",
                 'status_code': 422,
                 'status': false,
             }
         });
-       
+
     }
 
-    const userData = await Users.findOne({ "email": email });
+    const userData = await Users.findOne({ "email": email, providerType: "PASSKEY" });
 
     if (!userData) {
         return res.status(422).json({
@@ -574,14 +574,14 @@ exports.verifyLogin = async function (req, res) {
                 'status': false,
             }
         });
-      
+
     }
 
     const credential = userData.credentials.find(
         c => c.credentialID === reqId
     );
 
-    if(!credential){
+    if (!credential) {
 
         return res.status(422).json({
             'meta': {
@@ -606,14 +606,14 @@ exports.verifyLogin = async function (req, res) {
         }
     });
 
-    
+
     if (verification.verified) {
         credential.counter = verification.authenticationInfo.newCounter;
         await userData.save();
 
-        
 
-          const jwtPayload = {
+
+        const jwtPayload = {
             _id: userData._id,
             role: userData.role,
             email: userData.email
@@ -650,7 +650,7 @@ exports.verifyLogin = async function (req, res) {
             }
         });
 
-       
+
     } else {
         return res.status(422).json({
             'data': {
@@ -846,7 +846,7 @@ exports.signIn = async function (req, res) {
             }
         }
 
-  
+
         /* ---------------- EMAIL OTP LOGIN ---------------- */
         let isEmailOtpVerified = false;
         if (providerType === "EMAIL") {
