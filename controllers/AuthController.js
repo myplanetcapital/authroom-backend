@@ -380,9 +380,7 @@ exports.verifyRegistration = async function (req, res) {
     console.log(verification);
 
     if (verification.verified) {
-
-        //const { credentialPublicKey, credentialID, counter } =
-            
+    
         const { credential } = verification.registrationInfo;
         let credentialPublicKey =credential.publicKey;
         let credentialID = credential.id;  
