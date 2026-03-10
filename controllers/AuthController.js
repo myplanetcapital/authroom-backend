@@ -479,8 +479,8 @@ exports.verifyLogin = async function (req, res) {
     expectedOrigin: "android:apk-key-hash:XwPY03hLcxjPEWZYaLORii9VjqjN8ieIQ0YfS6FQru4",
     expectedRPID: rpID,
      credential: {
-        id: Buffer.from(credential.credentialID, "base64url"),
-        publicKey:Buffer.from(credential.publicKey, "base64url"),
+        id: credential.credentialID,
+        publicKey: isoBase64URL.toBuffer(authenticator.publicKey),
         counter: credential.counter
     }
   });
@@ -492,8 +492,8 @@ exports.verifyLogin = async function (req, res) {
     expectedOrigin: "android:apk-key-hash:XwPY03hLcxjPEWZYaLORii9VjqjN8ieIQ0YfS6FQru4",
     expectedRPID: rpID,
     credential: {
-        id: Buffer.from(credential.credentialID, "base64url"),
-        publicKey:Buffer.from(credential.publicKey, "base64url"),
+        id: credential.credentialID,
+        publicKey: isoBase64URL.toBuffer(authenticator.publicKey),
         counter: credential.counter
     }
   });
