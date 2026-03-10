@@ -377,6 +377,7 @@ exports.verifyRegistration = async function (req, res) {
         expectedRPID: rpID
     });
 
+    console.log(verification);
 
     if (verification.verified) {
 
