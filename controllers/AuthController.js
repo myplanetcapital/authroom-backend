@@ -381,6 +381,13 @@ exports.verifyRegistration = async function (req, res) {
         console.log(credentialID);
         console.log(counter);
 
+        console.log({
+            credentialID: isoBase64URL.fromBuffer(credentialID),
+            publicKey: isoBase64URL.fromBuffer(credentialPublicKey),
+            counter,
+            transports
+        });
+
         user.credentials.push({
             credentialID: isoBase64URL.fromBuffer(credentialID),
             publicKey: isoBase64URL.fromBuffer(credentialPublicKey),
