@@ -389,7 +389,7 @@ exports.verifyRegistration = async function (req, res) {
         });
 
         user.credentials.push({
-            credentialID: isoBase64URL.fromBuffer(credentialID),
+            credentialID: credentialID,
             publicKey: isoBase64URL.fromBuffer(credentialPublicKey),
             counter,
             transports
