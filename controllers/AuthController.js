@@ -406,6 +406,8 @@ exports.startLogin = async function (req, res) {
         return res.status(404).json({ error: "User not found" });
     }
 
+    console.log(userData);
+
     const options = generateAuthenticationOptions({
         rpID: rpID,
         allowCredentials: userData.credentials.map((cred) => ({
