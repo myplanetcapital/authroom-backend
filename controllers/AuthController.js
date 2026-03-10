@@ -408,7 +408,7 @@ exports.startLogin = async function (req, res) {
 
     console.log(userData);
 
-    const options = generateAuthenticationOptions({
+    const options = await generateAuthenticationOptions({
         rpID: rpID,
         allowCredentials: userData.credentials.map((cred) => ({
             id: Buffer.from(cred.credentialID, "base64"),
