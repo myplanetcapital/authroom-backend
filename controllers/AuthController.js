@@ -466,6 +466,9 @@ exports.verifyLogin = async function (req, res) {
         c => c.credentialID === reqId
     );
 
+   
+    
+
     const verification = await verifyAuthenticationResponse({
     response: reqAttestationResponse,
     expectedChallenge: expectedChallenge,
@@ -477,6 +480,10 @@ exports.verifyLogin = async function (req, res) {
       counter: credential.counter
     }
   });
+
+  console.log(credential);
+
+  console.log(verification);
 
    if (verification.verified) {
     credential.counter = verification.authenticationInfo.newCounter;
