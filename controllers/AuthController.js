@@ -417,6 +417,8 @@ exports.startLogin = async function (req, res) {
         userVerification: "preferred"
     });
 
+    console.log(options);
+
      await redisClient.setex(
         `PASSKEY_CHALLENGE:${email}`,
         30000,
