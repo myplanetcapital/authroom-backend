@@ -402,10 +402,12 @@ exports.verifyRegistration = async function (req, res) {
 
         await user.save();
 
-        res.json({ verified: true });
+        return res.json({ verified: true });
+    }else{
+        return res.json({ verified: false });
     }
 
-    res.json({ verified: false });
+    
 
 }
 
