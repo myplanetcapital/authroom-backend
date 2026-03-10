@@ -381,8 +381,12 @@ exports.verifyRegistration = async function (req, res) {
 
     if (verification.verified) {
 
-        const { credentialPublicKey, credentialID, counter } =
-            verification.registrationInfo;
+        //const { credentialPublicKey, credentialID, counter } =
+            
+        const { credential } = verification.registrationInfo;
+        let credentialPublicKey =credential.publicKey;
+        let credentialID = credential.id;  
+        let counter = credential.counter
 
         const user = await Users.findOne({"email":email});
 
