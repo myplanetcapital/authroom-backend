@@ -406,12 +406,19 @@ exports.startLogin = async function (req, res) {
         return res.status(404).json({ error: "User not found" });
     }
 
-    console.log(userData);
+    console.log({
+        rpID: rpID,
+        allowCredentials: userData.credentials.map((cred) => ({
+            id: cred.credentialID,
+            type: "public-key"
+        })),
+        userVerification: "preferred"
+    });
 
     const options = await generateAuthenticationOptions({
         rpID: rpID,
         allowCredentials: userData.credentials.map((cred) => ({
-            id: Buffer.from(cred.credentialID, "base64"),
+            id: cred.credentialID,
             type: "public-key"
         })),
         userVerification: "preferred"
