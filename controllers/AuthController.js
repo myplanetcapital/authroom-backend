@@ -31,7 +31,7 @@ const { isoBase64URL } = require('@simplewebauthn/server/helpers');
 const rpName = 'Auth Room';
 const rpID = 'api.authroom.com';
 const origin = 'https://authroom.com';
-const users = new Map();
+
 
 async function verifyFacebookToken(userAccessToken) {
     const appId = process.env.FACEBOOK_APP_ID;
@@ -278,38 +278,47 @@ exports.signIn = async function (req, res) {
 
 exports.startRegistration = async function (req, res) {
 
-    let email = req.body.userInfo ? req.body.userInfo.email : null;
-    let deviceId = req.body.deviceId ? req.body.deviceId : null;
+    const fieldsValidation = new Validator(req.body, {
+        "deviceId": 'required|string',
+        "platform": 'required|in:ANDROID,IOS',
+        'userInfo.email': 'required|email'
+    });
 
-    if (!email || !deviceId) {
+    const isValidated = await fieldsValidation.check();
+
+    if (!isValidated) {
+
         return res.status(422).json({
-            meta: {
-                message: "Email and deviceId required",
-                status_code: 422,
-                status: false,
+            'meta': {
+                'message': fieldsValidation.errors,
+                'status_code': 422,
+                'status': false,
             }
-
         });
 
     }
 
-    let user = await Users.findOne({ "email": email });
+    let email = req.body.userInfo ? req.body.userInfo.email : null;
+    //let deviceId = req.body.deviceId ? req.body.deviceId : null;
 
-    if (!user) {
-        user = await Users.create({
+    let userData = await Users.findOne({ "email": email });
+
+    if (!userData) {
+
+        userData = await Users.create({
             email: email,
-            providerType: "EMAIL",
+            providerType: "PASSKEY",
             isEmailVerified: true
         });
     }
 
-    if (!user.passkeyUserId) {
-        user.passkeyUserId = Buffer.from(user._id.toString());
-        await user.save();
+    if (!userData.passkeyUserId) {
+        userData.passkeyUserId = Buffer.from(userData._id.toString());
+        await userData.save();
     }
 
 
-    const userIdBuffer = Buffer.from(user._id.toString());
+    const userIdBuffer = Buffer.from(userData._id.toString());
 
     const options = await generateRegistrationOptions({
         rpName: rpName,
@@ -327,35 +336,59 @@ exports.startRegistration = async function (req, res) {
         }
     });
 
-    console.log(`PASSKEY_CHALLENGE:${email}`);
+    await redisClient.setex(`PASSKEY_CHALLENGE:${email}`, 300, options.challenge);
 
-    await redisClient.setex(
-        `PASSKEY_CHALLENGE:${email}`,
-        30000,
-        options.challenge
-    );
-
-
-    return res.json(options);
-
+    return res.status(200).json({
+        'data': options,
+        'meta': {
+            'message': "Start Registration",
+            'status_code': 200,
+            'status': true,
+        }
+    });
 
 
 }
 
 exports.verifyRegistration = async function (req, res) {
 
+    const fieldsValidation = new Validator(req.body, {
+        "attestationResponse": 'required',
+        "deviceId": 'required|string',
+        "platform": 'required|in:ANDROID,IOS',
+        'userInfo.email': 'required|email'
+    });
+
+    const isValidated = await fieldsValidation.check();
+
+    if (!isValidated) {
+
+        return res.status(422).json({
+            'meta': {
+                'message': fieldsValidation.errors,
+                'status_code': 422,
+                'status': false,
+            }
+        });
+
+    }
+
     const reqAttestationResponse = req.body.attestationResponse;
     let email = req.body.userInfo ? req.body.userInfo.email : null;
 
 
-    const expectedChallenge = await redisClient.get(
-        `PASSKEY_CHALLENGE:${email}`
-    );
+    const expectedChallenge = await redisClient.get(`PASSKEY_CHALLENGE:${email}`);
 
     if (!expectedChallenge) {
+
         return res.status(422).json({
-            meta: { message: "Challenge expired", status: false }
+            'meta': {
+                'message': "Challenge not found or may expired.",
+                'status_code': 422,
+                'status': false,
+            }
         });
+
     }
 
     const verification = await verifyRegistrationResponse({
@@ -365,8 +398,6 @@ exports.verifyRegistration = async function (req, res) {
         expectedRPID: rpID
     });
 
-    console.log(verification);
-
     if (verification.verified) {
 
         const { credential } = verification.registrationInfo;
@@ -375,31 +406,41 @@ exports.verifyRegistration = async function (req, res) {
         let counter = credential.counter;
         let transports = credential.transports;
 
-        const user = await Users.findOne({ "email": email });
+        const userData = await Users.findOne({ "email": email });
 
-        console.log(credentialPublicKey);
-        console.log(credentialID);
-        console.log(counter);
-
-        console.log({
+        userData.credentials.push({
             credentialID: credentialID,
             publicKey: isoBase64URL.fromBuffer(credentialPublicKey),
             counter,
             transports
         });
 
-        user.credentials.push({
-            credentialID: credentialID,
-            publicKey: isoBase64URL.fromBuffer(credentialPublicKey),
-            counter,
-            transports
+        await userData.save();
+
+        return res.status(200).json({
+            'data': {
+                "verified": true
+            },
+            'meta': {
+                'message': "Credential Verified.",
+                'status_code': 200,
+                'status': true,
+            }
         });
 
-        await user.save();
-
-        return res.json({ verified: true });
     } else {
-        return res.json({ verified: false });
+
+        return res.status(422).json({
+            'data': {
+                "verified": false
+            },
+            'meta': {
+                'message': "Credential Not Verified.",
+                'status_code': 422,
+                'status': false,
+            }
+        });
+
     }
 
 
@@ -408,47 +449,102 @@ exports.verifyRegistration = async function (req, res) {
 
 exports.startLogin = async function (req, res) {
 
+    const fieldsValidation = new Validator(req.body, {
+        "deviceId": 'required|string',
+        "platform": 'required|in:ANDROID,IOS',
+        'userInfo.email': 'required|email'
+    });
+
+    const isValidated = await fieldsValidation.check();
+
+    if (!isValidated) {
+
+        return res.status(422).json({
+            'meta': {
+                'message': fieldsValidation.errors,
+                'status_code': 422,
+                'status': false,
+            }
+        });
+
+    }
+
     let email = req.body.userInfo ? req.body.userInfo.email : null;
 
     const userData = await Users.findOne({ "email": email });
 
     if (!userData) {
-        return res.status(404).json({ error: "User not found" });
+
+        return res.status(422).json({
+            'meta': {
+                'message': "User not found.",
+                'status_code': 422,
+                'status': false,
+            }
+        });
+
     }
 
-    console.log({
-        rpID: rpID,
-        allowCredentials: userData.credentials.map((cred) => ({
-            id: cred.credentialID,
-            type: "public-key",
-            transports:cred.transports
-        })),
-        userVerification: "preferred"
-    });
+    if (userData.credentials.length == 0) {
+
+        return res.status(422).json({
+            'meta': {
+                'message': "User not found.",
+                'status_code': 422,
+                'status': false,
+            }
+        });
+
+    }
+
 
     const options = await generateAuthenticationOptions({
         rpID: rpID,
         allowCredentials: userData.credentials.map((cred) => ({
             id: cred.credentialID,
             type: "public-key",
-             transports:cred.transports
+            transports: cred.transports
         })),
         userVerification: "preferred"
     });
 
-    console.log(options);
 
-     await redisClient.setex(
-        `PASSKEY_CHALLENGE:${email}`,
-        30000,
-        options.challenge
-    );
+    await redisClient.setex(`PASSKEY_CHALLENGE:${email}`, 300, options.challenge);
 
-    return res.json(options);
+    return res.status(200).json({
+        "data": options,
+        'meta': {
+            'message': "Start Login.",
+            'status_code': 200,
+            'status': true,
+        }
+    });
+
 
 }
 
 exports.verifyLogin = async function (req, res) {
+
+     const fieldsValidation = new Validator(req.body, {
+        "attestationResponse": 'required',
+        "deviceId": 'required|string',
+        "platform": 'required|in:ANDROID,IOS',
+        'userInfo.email': 'required|email'
+    });
+
+    const isValidated = await fieldsValidation.check();
+
+    if (!isValidated) {
+
+        return res.status(422).json({
+            'meta': {
+                'message': fieldsValidation.errors,
+                'status_code': 422,
+                'status': false,
+            }
+        });
+
+    }
 
     const reqAttestationResponse = req.body.attestationResponse;
     let reqId = reqAttestationResponse.id;
@@ -456,101 +552,160 @@ exports.verifyLogin = async function (req, res) {
 
     const expectedChallenge = await redisClient.get(`PASSKEY_CHALLENGE:${email}`);
 
-     if (!expectedChallenge) {
-        return res.status(422).json({
-            meta: { message: "Challenge expired", status: false }
+    if (!expectedChallenge) {
+
+         return res.status(422).json({
+            'meta': {
+                'message': "Challenge not found or may expired",
+                'status_code': 422,
+                'status': false,
+            }
         });
+       
     }
 
-    const userData = await Users.findOne({ email: email });
+    const userData = await Users.findOne({ "email": email });
 
-     if (!userData) {
-        return res.status(404).json({ error: "User not found" });
+    if (!userData) {
+        return res.status(422).json({
+            'meta': {
+                'message': "User not found",
+                'status_code': 422,
+                'status': false,
+            }
+        });
+      
     }
 
     const credential = userData.credentials.find(
         c => c.credentialID === reqId
     );
 
-   
-    console.log({
-    response: reqAttestationResponse,
-    expectedChallenge: expectedChallenge,
-    expectedOrigin: "android:apk-key-hash:XwPY03hLcxjPEWZYaLORii9VjqjN8ieIQ0YfS6FQru4",
-    expectedRPID: rpID,
-     credential: {
-        id: credential.credentialID,
-        publicKey: isoBase64URL.toBuffer(credential.publicKey),
-        counter: credential.counter
-    }
-  });
-    
+    if(!credential){
 
-    const verification = await verifyAuthenticationResponse({
-    response: reqAttestationResponse,
-    expectedChallenge: expectedChallenge,
-    expectedOrigin: "android:apk-key-hash:XwPY03hLcxjPEWZYaLORii9VjqjN8ieIQ0YfS6FQru4",
-    expectedRPID: rpID,
-    credential: {
-        id: credential.credentialID,
-        publicKey: isoBase64URL.toBuffer(credential.publicKey),
-        counter: credential.counter
-    }
-  });
-
-  console.log(verification);
-
-   if (verification.verified) {
-    credential.counter = verification.authenticationInfo.newCounter;
-    await userData.save();
-
-    return res.json({ verified: true });
-  } else {
-    return res.json({ verified: false });
-  }
-
-
-/*
-    const { username, assertionResponse } = req.body;
-
-    const user = users.get(username);
-
-    const device = user.devices.find(dev =>
-        dev.credentialID.equals(Buffer.from(assertionResponse.rawId, "base64url"))
-    );
-
-    if (!device) {
-        return res.status(400).json({ error: "Device not found" });
-    }
-
-    let verification;
-
-    try {
-
-        verification = await verifyAuthenticationResponse({
-
-            response: assertionResponse,
-
-            expectedChallenge: user.currentChallenge,
-
-            expectedOrigin: origin,
-
-            expectedRPID: rpID,
-
-            authenticator: device
+        return res.status(422).json({
+            'meta': {
+                'message': "User credential not found",
+                'status_code': 422,
+                'status': false,
+            }
         });
 
-    } catch (error) {
-        return res.status(400).json({ error: error.message });
     }
 
-    const { verified, authenticationInfo } = verification;
 
-    if (verified) {
-        device.counter = authenticationInfo.newCounter;
+    const verification = await verifyAuthenticationResponse({
+        response: reqAttestationResponse,
+        expectedChallenge: expectedChallenge,
+        expectedOrigin: "android:apk-key-hash:XwPY03hLcxjPEWZYaLORii9VjqjN8ieIQ0YfS6FQru4",
+        expectedRPID: rpID,
+        credential: {
+            id: credential.credentialID,
+            publicKey: isoBase64URL.toBuffer(credential.publicKey),
+            counter: credential.counter
+        }
+    });
+
+    
+    if (verification.verified) {
+        credential.counter = verification.authenticationInfo.newCounter;
+        await userData.save();
+
+        
+
+          const jwtPayload = {
+            _id: userData._id,
+            role: userData.role,
+            email: userData.email
+        };
+
+        const encrypted = CryptoJS.AES.encrypt(
+            JSON.stringify(jwtPayload),
+            process.env.CRYPTO_KEY
+        ).toString();
+
+        const tokenJwt = jwt.sign(
+            { encryptedToken: encrypted },
+            process.env.JWT_SECRET_KEY
+        );
+
+        await redisClient.set(`AUTH_TOKEN:${userData._id}`, tokenJwt);
+
+        return res.status(200).json({
+            data: {
+                "verified": true,
+                accessToken: tokenJwt,
+                tokenType: "Bearer",
+                userDetail: {
+                    id: userData._id,
+                    email: userData.email,
+                    role: userData.role,
+                    isEmailVerified: userData.isEmailVerified
+                }
+            },
+            meta: {
+                message: "Success",
+                status_code: 200,
+                status: true
+            }
+        });
+
+       
+    } else {
+        return res.status(422).json({
+            'data': {
+                "verified": false
+            },
+            'meta': {
+                'message': "Credential Not Verified.",
+                'status_code': 422,
+                'status': false,
+            }
+        });
     }
 
-    res.json({ verified });*/
+
+    /*
+        const { username, assertionResponse } = req.body;
+    
+        const user = users.get(username);
+    
+        const device = user.devices.find(dev =>
+            dev.credentialID.equals(Buffer.from(assertionResponse.rawId, "base64url"))
+        );
+    
+        if (!device) {
+            return res.status(400).json({ error: "Device not found" });
+        }
+    
+        let verification;
+    
+        try {
+    
+            verification = await verifyAuthenticationResponse({
+    
+                response: assertionResponse,
+    
+                expectedChallenge: user.currentChallenge,
+    
+                expectedOrigin: origin,
+    
+                expectedRPID: rpID,
+    
+                authenticator: device
+            });
+    
+        } catch (error) {
+            return res.status(400).json({ error: error.message });
+        }
+    
+        const { verified, authenticationInfo } = verification;
+    
+        if (verified) {
+            device.counter = authenticationInfo.newCounter;
+        }
+    
+        res.json({ verified });*/
 
 }
 
@@ -691,193 +846,7 @@ exports.signIn = async function (req, res) {
             }
         }
 
-        /*
-        if (providerType === "PASSKEY") {
-
-            let email = req.body.userInfo ? req.body.userInfo.email : null;
-            let deviceId = req.body.deviceId ? req.body.deviceId : null;
-            let passkeyResponse = req.body.passkeyResponse ? req.body.passkeyResponse : null;
-
-            if (!email || !deviceId) {
-                return res.status(422).json({
-                    meta: { message: "Email and deviceId required", status: false }
-                });
-            }
-
-            const userIdBuffer = crypto
-            .createHash("sha256")
-            .update(email)
-            .digest();
-
-            let user = await Users.findOne({ email });
-            let passkey = user?.passkeys.find(p => p.deviceId === deviceId);
-
-            
-            if (!passkeyResponse) {
-
-                let options;
-
-                // 🆕 New device OR new user → registration
-                if (!passkey) {
-                    options = await generateRegistrationOptions({
-                        rpName: rpName,
-                        rpID,
-                        userID: userIdBuffer,
-                        userName: email,
-                        userDisplayName: email,
-                        timeout: 60000,
-                        authenticatorSelection: {
-                            residentKey: "preferred",
-                            userVerification: "preferred"
-                        }
-                    });
-                }
-
-                // 🔓 Existing device → authentication
-                else {
-                    options = await generateAuthenticationOptions({
-                        rpID,
-                        allowCredentials: [{
-                            id: passkey.credentialID,
-                            type: "public-key"
-                        }],
-                        userVerification: "preferred"
-                    });
-                }
-
-                console.log(req.session);
-                console.log(options);
-                // 🔐 Store challenge (Redis recommended)
-                req.session.passkeyChallenge = options.challenge;
-                req.session.passkeyEmail = email;
-                req.session.passkeyDeviceId = deviceId;
-
-                return res.status(200).json({
-                    meta: {
-                        message: "Passkey options",
-                        status: true
-                    },
-                    data: options
-                });
-            }
-
-          
-
-            const expectedChallenge = req.session.passkeyChallenge;
-
-            if (!expectedChallenge) {
-                return res.status(422).json({
-                    meta: { message: "Challenge expired", status: false }
-                });
-            }
-
-            // 🔓 LOGIN
-            if (passkey) {
-
-                const verification = await verifyAuthenticationResponse({
-                    response: passkeyResponse,
-                    expectedChallenge,
-                    expectedOrigin: origin,
-                    expectedRPID: rpID,
-                    authenticator: {
-                        credentialID: passkey.credentialID,
-                        credentialPublicKey: passkey.publicKey,
-                        counter: passkey.counter
-                    }
-                });
-
-                if (!verification.verified) {
-                    return res.status(422).json({
-                        meta: { message: "Invalid passkey", status: false }
-                    });
-                }
-
-                passkey.counter = verification.authenticationInfo.newCounter;
-                passkey.lastUsedAt = new Date();
-                await user.save();
-            }
-
-            // 🆕 REGISTER
-            else {
-
-                const verification = await verifyRegistrationResponse({
-                    response: passkeyResponse,
-                    expectedChallenge,
-                    expectedOrigin: origin,
-                    expectedRPID: rpID
-                });
-
-                if (!verification.verified) {
-                    return res.status(422).json({
-                        meta: { message: "Passkey registration failed", status: false }
-                    });
-                }
-
-                const { credentialPublicKey, credentialID, counter } =
-                    verification.registrationInfo;
-
-                if (!user) {
-                    user = await Users.create({
-                        email,
-                        providerType: "PASSKEY",
-                        isEmailVerified: true,
-                        passkeys: []
-                    });
-                }
-
-                user.passkeys.push({
-                    deviceId,
-                    credentialID,
-                    publicKey: credentialPublicKey,
-                    counter,
-                    platform,
-                    deviceName: req.headers["user-agent"]
-                });
-                user.passkeyUserId = userIdBuffer;
-                await user.save();
-            }
-
-            // 🧹 Cleanup
-            delete req.session.passkeyChallenge;
-
-          
-
-            const jwtPayload = {
-                _id: user._id,
-                role: user.role,
-                email: user.email
-            };
-
-            const encrypted = CryptoJS.AES.encrypt(
-                JSON.stringify(jwtPayload),
-                process.env.CRYPTO_KEY
-            ).toString();
-
-            const tokenJwt = jwt.sign(
-                { encryptedToken: encrypted },
-                process.env.JWT_SECRET_KEY
-            );
-
-            return res.status(200).json({
-                data: {
-                    accessToken: tokenJwt,
-                    tokenType: "Bearer",
-                    userDetail: {
-                        id: user._id,
-                        email: user.email,
-                        role: user.role
-                    }
-                },
-                meta: {
-                    message: "Success",
-                    status: true,
-                    status_code: 200
-                }
-            });
-        }*/
-
-
-
+  
         /* ---------------- EMAIL OTP LOGIN ---------------- */
         let isEmailOtpVerified = false;
         if (providerType === "EMAIL") {
@@ -990,7 +959,7 @@ exports.signIn = async function (req, res) {
             process.env.JWT_SECRET_KEY
         );
 
-        //await redisClient.set(`AUTH_TOKEN:${user._id}`, tokenJwt);
+        await redisClient.set(`AUTH_TOKEN:${user._id}`, tokenJwt);
 
         return res.status(200).json({
             data: {

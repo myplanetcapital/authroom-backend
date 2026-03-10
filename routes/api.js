@@ -16,8 +16,6 @@ module.exports=function(app){
 	});
 	
 	app.use('/api',function(req,res,next){
-		console.log(req.url);
-		console.log(req.body);
 		next();
 	});
 	app.use('/api',ProtectedRoutes);
