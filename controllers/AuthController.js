@@ -330,7 +330,7 @@ exports.startRegistration = async function (req, res) {
 
     await redisClient.setex(
         `PASSKEY_CHALLENGE:${email}`,
-        300,
+        30000,
         options.challenge
     );
 
@@ -384,6 +384,10 @@ exports.verifyRegistration = async function (req, res) {
             verification.registrationInfo;
 
         const user = await Users.findOne({"email":email});
+
+        console.log(credentialPublicKey);
+         console.log(credentialID);
+          console.log(counter);
 
         user.credentials.push({
             credentialID: credentialID.toString("base64"),
