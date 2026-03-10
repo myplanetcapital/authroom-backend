@@ -412,7 +412,8 @@ exports.startLogin = async function (req, res) {
         rpID: rpID,
         allowCredentials: userData.credentials.map((cred) => ({
             id: cred.credentialID,
-            type: "public-key"
+            type: "public-key",
+            transports:cred.transports
         })),
         userVerification: "preferred"
     });
@@ -421,7 +422,8 @@ exports.startLogin = async function (req, res) {
         rpID: rpID,
         allowCredentials: userData.credentials.map((cred) => ({
             id: cred.credentialID,
-            type: "public-key"
+            type: "public-key",
+             transports:cred.transports
         })),
         userVerification: "preferred"
     });
