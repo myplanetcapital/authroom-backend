@@ -383,7 +383,7 @@ exports.verifyRegistration = async function (req, res) {
         const { credentialPublicKey, credentialID, counter } =
             verification.registrationInfo;
 
-        const user = await Users.findById(req.body.userId);
+        const user = await Users.findOne({"email":email});
 
         user.credentials.push({
             credentialID: credentialID.toString("base64"),
