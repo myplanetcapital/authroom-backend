@@ -319,7 +319,7 @@ exports.startRegistration = async function (req, res) {
         timeout: 60000,
         attestationType: "none",
         authenticatorSelection: {
-           residentKey: 'required',
+            residentKey: 'required',
             userVerification: 'required',
             authenticatorAttachment: 'platform',
             requireResidentKey: false,
@@ -334,7 +334,7 @@ exports.startRegistration = async function (req, res) {
         options.challenge
     );
 
-   
+
     return res.json(options);
 
 
@@ -346,29 +346,16 @@ exports.verifyRegistration = async function (req, res) {
     const reqAttestationResponse = req.body.attestationResponse;
     let email = req.body.userInfo ? req.body.userInfo.email : null;
 
-   
 
     const expectedChallenge = await redisClient.get(
         `PASSKEY_CHALLENGE:${email}`
     );
-
-    console.log(`PASSKEY_CHALLENGE:${email}`);
-    console.log(expectedChallenge);
-
-     
 
     if (!expectedChallenge) {
         return res.status(422).json({
             meta: { message: "Challenge expired", status: false }
         });
     }
-
-     console.log({
-        response: reqAttestationResponse,
-        expectedChallenge: expectedChallenge,
-        expectedOrigin: origin,
-        expectedRPID: rpID
-    });
 
     const verification = await verifyRegistrationResponse({
         response: reqAttestationResponse,
@@ -380,17 +367,17 @@ exports.verifyRegistration = async function (req, res) {
     console.log(verification);
 
     if (verification.verified) {
-    
+
         const { credential } = verification.registrationInfo;
-        let credentialPublicKey =credential.publicKey;
-        let credentialID = credential.id;  
+        let credentialPublicKey = credential.publicKey;
+        let credentialID = credential.id;
         let counter = credential.counter
 
-        const user = await Users.findOne({"email":email});
+        const user = await Users.findOne({ "email": email });
 
         console.log(credentialPublicKey);
-         console.log(credentialID);
-          console.log(counter);
+        console.log(credentialID);
+        console.log(counter);
 
         user.credentials.push({
             credentialID: credentialID.toString("base64"),
@@ -401,87 +388,131 @@ exports.verifyRegistration = async function (req, res) {
         await user.save();
 
         return res.json({ verified: true });
-    }else{
+    } else {
         return res.json({ verified: false });
     }
 
-    
+
 
 }
 
 exports.startLogin = async function (req, res) {
 
-     const { username } = req.body;
+    let email = req.body.userInfo ? req.body.userInfo.email : null;
 
-  const user = users.get(username);
+    const userData = Users.findOne({ "email": email });
 
-  if (!user) {
-    return res.status(404).json({ error: "User not found" });
-  }
+    if (!userData) {
+        return res.status(404).json({ error: "User not found" });
+    }
 
-  const options = await generateAuthenticationOptions({
+    const options = generateAuthenticationOptions({
+        rpID: rpID,
+        allowCredentials: userData.credentials.map((cred) => ({
+            id: Buffer.from(cred.credentialID, "base64"),
+            type: "public-key"
+        })),
+        userVerification: "preferred"
+    });
 
-    timeout: 60000,
+     await redisClient.setex(
+        `PASSKEY_CHALLENGE:${email}`,
+        30000,
+        options.challenge
+    );
 
-    rpID,
-
-    allowCredentials: user.devices.map(device => ({
-      id: device.credentialID,
-      type: "public-key",
-      transports: device.transports
-    })),
-
-    userVerification: "preferred"
-  });
-
-  user.currentChallenge = options.challenge;
-
-  res.json(options);
+    return res.json(options);
 
 }
 
 exports.verifyLogin = async function (req, res) {
 
+    const reqAttestationResponse = req.body.attestationResponse;
+    let email = req.body.userInfo ? req.body.userInfo.email : null;
+
+    const expectedChallenge = await redisClient.get(
+        `PASSKEY_CHALLENGE:${email}`
+    );
+
+     if (!expectedChallenge) {
+        return res.status(422).json({
+            meta: { message: "Challenge expired", status: false }
+        });
+    }
+
+    const userData = await Users.findOne({ email: email });
+
+     if (!userData) {
+        return res.status(404).json({ error: "User not found" });
+    }
+
+    const credential = user.credentials.find(
+        c => c.credentialID === req.body.id
+    );
+
+    const verification = await verifyAuthenticationResponse({
+    response: reqAttestationResponse,
+    expectedChallenge: expectedChallenge,
+    expectedOrigin: "android:apk-key-hash:XwPY03hLcxjPEWZYaLORii9VjqjN8ieIQ0YfS6FQru4",
+    expectedRPID: rpID,
+    authenticator: {
+      credentialID: Buffer.from(credential.credentialID, "base64"),
+      credentialPublicKey: Buffer.from(credential.publicKey, "base64"),
+      counter: credential.counter
+    }
+  });
+
+   if (verification.verified) {
+    credential.counter = verification.authenticationInfo.newCounter;
+    await user.save();
+
+    return res.json({ verified: true });
+  } else {
+    return res.json({ verified: false });
+  }
+
+
+/*
     const { username, assertionResponse } = req.body;
 
-  const user = users.get(username);
+    const user = users.get(username);
 
-  const device = user.devices.find(dev =>
-    dev.credentialID.equals(Buffer.from(assertionResponse.rawId, "base64url"))
-  );
+    const device = user.devices.find(dev =>
+        dev.credentialID.equals(Buffer.from(assertionResponse.rawId, "base64url"))
+    );
 
-  if (!device) {
-    return res.status(400).json({ error: "Device not found" });
-  }
+    if (!device) {
+        return res.status(400).json({ error: "Device not found" });
+    }
 
-  let verification;
+    let verification;
 
-  try {
+    try {
 
-    verification = await verifyAuthenticationResponse({
+        verification = await verifyAuthenticationResponse({
 
-      response: assertionResponse,
+            response: assertionResponse,
 
-      expectedChallenge: user.currentChallenge,
+            expectedChallenge: user.currentChallenge,
 
-      expectedOrigin: origin,
+            expectedOrigin: origin,
 
-      expectedRPID: rpID,
+            expectedRPID: rpID,
 
-      authenticator: device
-    });
+            authenticator: device
+        });
 
-  } catch (error) {
-    return res.status(400).json({ error: error.message });
-  }
+    } catch (error) {
+        return res.status(400).json({ error: error.message });
+    }
 
-  const { verified, authenticationInfo } = verification;
+    const { verified, authenticationInfo } = verification;
 
-  if (verified) {
-    device.counter = authenticationInfo.newCounter;
-  }
+    if (verified) {
+        device.counter = authenticationInfo.newCounter;
+    }
 
-  res.json({ verified });
+    res.json({ verified });*/
 
 }
 
