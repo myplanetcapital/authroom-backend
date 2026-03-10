@@ -439,6 +439,7 @@ exports.startLogin = async function (req, res) {
 exports.verifyLogin = async function (req, res) {
 
     const reqAttestationResponse = req.body.attestationResponse;
+    let reqId = reqAttestationResponse.id;
     let email = req.body.userInfo ? req.body.userInfo.email : null;
 
     const expectedChallenge = await redisClient.get(
@@ -458,7 +459,7 @@ exports.verifyLogin = async function (req, res) {
     }
 
     const credential = userData.credentials.find(
-        c => c.credentialID === req.body.id
+        c => c.credentialID === reqId
     );
 
     const verification = await verifyAuthenticationResponse({
