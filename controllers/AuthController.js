@@ -493,7 +493,7 @@ exports.verifyLogin = async function (req, res) {
     expectedRPID: rpID,
     credential: {
         id: credential.credentialID,
-        publicKey: isoBase64URL.toBuffer(authenticator.publicKey),
+        publicKey: isoBase64URL.toBuffer(credential.publicKey),
         counter: credential.counter
     }
   });
