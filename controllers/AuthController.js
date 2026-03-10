@@ -400,7 +400,7 @@ exports.startLogin = async function (req, res) {
 
     let email = req.body.userInfo ? req.body.userInfo.email : null;
 
-    const userData = Users.findOne({ "email": email });
+    const userData = await Users.findOne({ "email": email });
 
     if (!userData) {
         return res.status(404).json({ error: "User not found" });
