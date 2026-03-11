@@ -397,6 +397,7 @@ exports.verifyRegistration = async function (req, res) {
         expectedChallenge: expectedChallenge,
         expectedOrigin: [
             "https://authroom.com",
+            "https://api.authroom.com",
             "https://www.authroom.com",
             "android:apk-key-hash:XwPY03hLcxjPEWZYaLORii9VjqjN8ieIQ0YfS6FQru4"
         ],
@@ -634,6 +635,7 @@ exports.verifyLogin = async function (req, res) {
         expectedChallenge: expectedChallenge,
         expectedOrigin: [
             "https://authroom.com",
+            "https://api.authroom.com",
             "https://www.authroom.com",
             "android:apk-key-hash:XwPY03hLcxjPEWZYaLORii9VjqjN8ieIQ0YfS6FQru4"
         ],
