@@ -395,14 +395,18 @@ exports.verifyRegistration = async function (req, res) {
     const verification = await verifyRegistrationResponse({
         response: reqAttestationResponse,
         expectedChallenge: expectedChallenge,
-        expectedOrigin: "android:apk-key-hash:XwPY03hLcxjPEWZYaLORii9VjqjN8ieIQ0YfS6FQru4",
+        expectedOrigin: [
+            "https://authroom.com",
+            "https://www.authroom.com",
+            "android:apk-key-hash:XwPY03hLcxjPEWZYaLORii9VjqjN8ieIQ0YfS6FQru4"
+        ],
         expectedRPID: rpID
     });
 
-   
+
     if (verification.verified) {
 
-        
+
 
         const { credential } = verification.registrationInfo;
         let credentialPublicKey = credential.publicKey;
@@ -410,7 +414,7 @@ exports.verifyRegistration = async function (req, res) {
         let counter = credential.counter;
         let transports = credential.transports;
 
-        const userData = await Users.findOne({ "email": email});
+        const userData = await Users.findOne({ "email": email });
 
         userData.credentials.push({
             credentialID: credentialID,
@@ -421,7 +425,7 @@ exports.verifyRegistration = async function (req, res) {
 
         await userData.save();
 
-           const jwtPayload = {
+        const jwtPayload = {
             _id: userData._id,
             role: userData.role,
             email: userData.email
@@ -458,7 +462,7 @@ exports.verifyRegistration = async function (req, res) {
             }
         });
 
-    
+
     } else {
 
         return res.status(422).json({
@@ -502,7 +506,7 @@ exports.startLogin = async function (req, res) {
 
     let email = req.body.userInfo ? req.body.userInfo.email : null;
 
-    const userData = await Users.findOne({ "email": email});
+    const userData = await Users.findOne({ "email": email });
 
     if (!userData) {
 
@@ -595,7 +599,7 @@ exports.verifyLogin = async function (req, res) {
 
     }
 
-    const userData = await Users.findOne({ "email": email});
+    const userData = await Users.findOne({ "email": email });
 
     if (!userData) {
         return res.status(422).json({
@@ -628,7 +632,11 @@ exports.verifyLogin = async function (req, res) {
     const verification = await verifyAuthenticationResponse({
         response: reqAttestationResponse,
         expectedChallenge: expectedChallenge,
-        expectedOrigin: "android:apk-key-hash:XwPY03hLcxjPEWZYaLORii9VjqjN8ieIQ0YfS6FQru4",
+        expectedOrigin: [
+            "https://authroom.com",
+            "https://www.authroom.com",
+            "android:apk-key-hash:XwPY03hLcxjPEWZYaLORii9VjqjN8ieIQ0YfS6FQru4"
+        ],
         expectedRPID: rpID,
         credential: {
             id: credential.credentialID,
