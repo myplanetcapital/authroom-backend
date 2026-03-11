@@ -378,6 +378,7 @@ exports.verifyRegistration = async function (req, res) {
 
 
     const expectedChallenge = await redisClient.get(`PASSKEY_CHALLENGE:${email}`);
+    console.log(expectedChallenge);
 
     if (!expectedChallenge) {
 
@@ -398,7 +399,18 @@ exports.verifyRegistration = async function (req, res) {
         expectedRPID: rpID
     });
 
+    console.log({
+        response: reqAttestationResponse,
+        expectedChallenge: expectedChallenge,
+        expectedOrigin: "android:apk-key-hash:XwPY03hLcxjPEWZYaLORii9VjqjN8ieIQ0YfS6FQru4",
+        expectedRPID: rpID
+    });
+
+    console.log(verification);
+
     if (verification.verified) {
+
+        
 
         const { credential } = verification.registrationInfo;
         let credentialPublicKey = credential.publicKey;
