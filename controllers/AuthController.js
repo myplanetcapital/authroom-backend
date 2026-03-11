@@ -406,7 +406,7 @@ exports.verifyRegistration = async function (req, res) {
         let counter = credential.counter;
         let transports = credential.transports;
 
-        const userData = await Users.findOne({ "email": email, providerType: "PASSKEY" });
+        const userData = await Users.findOne({ "email": email});
 
         userData.credentials.push({
             credentialID: credentialID,
@@ -471,7 +471,7 @@ exports.startLogin = async function (req, res) {
 
     let email = req.body.userInfo ? req.body.userInfo.email : null;
 
-    const userData = await Users.findOne({ "email": email, providerType: "PASSKEY" });
+    const userData = await Users.findOne({ "email": email});
 
     if (!userData) {
 
@@ -564,7 +564,7 @@ exports.verifyLogin = async function (req, res) {
 
     }
 
-    const userData = await Users.findOne({ "email": email, providerType: "PASSKEY" });
+    const userData = await Users.findOne({ "email": email});
 
     if (!userData) {
         return res.status(422).json({
