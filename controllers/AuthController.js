@@ -399,15 +399,7 @@ exports.verifyRegistration = async function (req, res) {
         expectedRPID: rpID
     });
 
-    console.log({
-        response: reqAttestationResponse,
-        expectedChallenge: expectedChallenge,
-        expectedOrigin: "android:apk-key-hash:XwPY03hLcxjPEWZYaLORii9VjqjN8ieIQ0YfS6FQru4",
-        expectedRPID: rpID
-    });
-
-    console.log(verification);
-
+   
     if (verification.verified) {
 
         
@@ -429,17 +421,44 @@ exports.verifyRegistration = async function (req, res) {
 
         await userData.save();
 
+           const jwtPayload = {
+            _id: userData._id,
+            role: userData.role,
+            email: userData.email
+        };
+
+        const encrypted = CryptoJS.AES.encrypt(
+            JSON.stringify(jwtPayload),
+            process.env.CRYPTO_KEY
+        ).toString();
+
+        const tokenJwt = jwt.sign(
+            { encryptedToken: encrypted },
+            process.env.JWT_SECRET_KEY
+        );
+
+        await redisClient.set(`AUTH_TOKEN:${userData._id}`, tokenJwt);
+
         return res.status(200).json({
-            'data': {
-                "verified": true
+            data: {
+                "verified": true,
+                accessToken: tokenJwt,
+                tokenType: "Bearer",
+                userDetail: {
+                    id: userData._id,
+                    email: userData.email,
+                    role: userData.role,
+                    isEmailVerified: userData.isEmailVerified
+                }
             },
-            'meta': {
-                'message': "Credential Verified.",
-                'status_code': 200,
-                'status': true,
+            meta: {
+                message: "Success",
+                status_code: 200,
+                status: true
             }
         });
 
+    
     } else {
 
         return res.status(422).json({
