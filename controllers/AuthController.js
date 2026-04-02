@@ -19,7 +19,6 @@ const myCache = new NodeCache();
 let sendEmailOtp = require('../vendor/sendEmailOtp');
 const crypto = require("crypto");
 let verifyEmailOtp = require('../vendor/verifyEmailOtp');
-
 const {
     generateRegistrationOptions,
     generateAuthenticationOptions,
