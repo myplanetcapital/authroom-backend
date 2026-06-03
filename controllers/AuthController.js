@@ -31,7 +31,6 @@ const rpName = 'Auth Room';
 const rpID = 'api.authroom.com';
 const origin = 'https://authroom.com';
 
-
 async function verifyFacebookToken(userAccessToken) {
     const appId = process.env.FACEBOOK_APP_ID;
     const appSecret = process.env.FACEBOOK_APP_SECRET;
