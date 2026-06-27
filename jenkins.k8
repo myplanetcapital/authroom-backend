@@ -26,6 +26,12 @@ spec:
     - name: docker-config
       mountPath: /kaniko/.docker
 
+  - name: kubectl
+    image: alpine/k8s:1.30.2
+    command:
+      - cat
+    tty: true
+
   volumes:
   - name: docker-config
     secret:
@@ -58,6 +64,17 @@ spec:
             --dockerfile $WORKSPACE/Dockerfile \
             --destination $IMAGE \
             --cache=false
+          """
+        }
+      }
+    }
+    stage('Deploy') {
+      steps {
+        container('kubectl') {
+          sh """
+            kubectl -n myplanetcapital set image deployment/authroom-backend \
+              authroom-backend=\${IMAGE}
+            kubectl -n myplanetcapital rollout restart deployment/authroom-backend
           """
         }
       }
