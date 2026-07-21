@@ -1,0 +1,83 @@
+pipeline {
+  agent {
+    kubernetes {
+      yaml """
+apiVersion: v1
+kind: Pod
+metadata:
+  namespace: myplanetcapital
+
+spec:
+  serviceAccountName: jenkins-agent
+
+  nodeSelector:
+    jenkins-agent: "true"
+
+  containers:
+  - name: kaniko
+    image: gcr.io/kaniko-project/executor:v1.23.2-debug
+
+    command:
+    - cat
+
+    tty: true
+
+    volumeMounts:
+    - name: docker-config
+      mountPath: /kaniko/.docker
+
+  - name: kubectl
+    image: alpine/k8s:1.30.2
+    command:
+      - cat
+    tty: true
+
+  volumes:
+  - name: docker-config
+    secret:
+      secretName: regcred
+      items:
+      - key: .dockerconfigjson
+        path: config.json
+"""
+    }
+  }
+
+  environment {
+    IMAGE = "registry.myplanetcapital.com/authroom-backend:${BUILD_NUMBER}"
+  }
+
+  stages {
+
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Build & Push Docker Image') {
+      steps {
+        container('kaniko') {
+          sh """
+          /kaniko/executor \
+            --context $WORKSPACE \
+            --dockerfile $WORKSPACE/Dockerfile \
+            --destination $IMAGE \
+            --cache=false
+          """
+        }
+      }
+    }
+    stage('Deploy') {
+      steps {
+        container('kubectl') {
+          sh """
+            kubectl -n myplanetcapital set image deployment/authroom-backend \
+              authroom-backend=\${IMAGE}
+            kubectl -n myplanetcapital rollout restart deployment/authroom-backend
+          """
+        }
+      }
+    }
+  }
+}
