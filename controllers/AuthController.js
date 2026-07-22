@@ -46,7 +46,6 @@ async function verifyFacebookToken(userAccessToken) {
     return response.data;
 }
 
-
 async function key(kid) {
     const client = jwksClient({
         jwksUri: "https://appleid.apple.com/auth/keys",
