@@ -27,7 +27,6 @@ const {
 } = require('@simplewebauthn/server');
 const { isoBase64URL } = require('@simplewebauthn/server/helpers');
 
-
 const rpName = 'Auth Room';
 const rpID = 'api.authroom.com';
 const origin = 'https://authroom.com';
